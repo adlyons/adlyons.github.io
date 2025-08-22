@@ -178,7 +178,7 @@
             layers: `${radarStation}_${radarMode}`,
             format: "image/png",
             transparent: true,
-            opacity: 0.7,
+            opacity: 0.45,
             version: "1.3.0"
           }
         ).addTo(map);
@@ -304,18 +304,31 @@
           if (!map) {
             map = L.map('map', { zoomControl: false }).setView([lat, lon], 10);
 
-            const carIcon = L.icon({
-              iconUrl: "https://cdn-icons-png.flaticon.com/512/1680/1680219.png",
-              iconSize: [40,40],
-              iconAnchor: [20,20],
-              pane: "warningsPane"
-            });
-            marker = L.marker([lat, lon], {icon: carIcon}).addTo(map);
+            //L.tileLayer("https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png?api_key=93193627-3b89-42b8-b36d-b4f9720a3dac", {}).addTo(map);
 
-            L.tileLayer("https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png?api_key=93193627-3b89-42b8-b36d-b4f9720a3dac", {}).addTo(map);
+            L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png", {}).addTo(map);
+
+            map.createPane("labelsPane");
+            map.getPane("labelsPane").style.zIndex = 700;  // higher than radar/wwa/etc.
+
+            L.tileLayer("https://tiles.stadiamaps.com/tiles/stamen_terrain_lines/{z}/{x}/{y}{r}.png?api_key=93193627-3b89-42b8-b36d-b4f9720a3dac", {
+              pane: "labelsPane",
+              attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>'}).addTo(map);
+
+            L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png", {
+              pane: "labelsPane",
+              attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>'}).addTo(map);
 
             map.createPane("warningsPane");
             map.getPane("warningsPane").style.zIndex = 650;
+
+
+            const carIcon = L.icon({
+              iconUrl: "https://cdn-icons-png.flaticon.com/512/1680/1680219.png",
+              iconSize: [40,40],
+              iconAnchor: [20,20]
+            });
+            marker = L.marker([lat, lon], {icon: carIcon, pane: "warningsPane"}).addTo(map);
 
             wLayer = L.tileLayer.wms(
               "https://mapservices.weather.noaa.gov/eventdriven/services/WWA/watch_warn_adv/MapServer/WMSServer",
@@ -335,7 +348,7 @@
                 format: "image/png",
                 transparent: true,
                 version: "1.3.0",
-                opacity: 0.4
+                opacity: 0.5
               }
             ).addTo(map);
 
@@ -387,7 +400,7 @@
       setInterval(() => {
         if (map) {
           const current = map.getCenter();
-          map.setZoom(7);
+          map.setZoom(8);
           setTimeout(() => {
             map.setView(current, 10);
           }, 30 * 1000);
