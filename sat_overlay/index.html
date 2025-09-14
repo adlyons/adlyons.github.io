@@ -140,7 +140,7 @@
               format: "image/png",
               transparent: true,
               version: "1.3.0",
-              opacity: 0.45
+              opacity: 0.65
             }
           );
         } else {
@@ -161,7 +161,7 @@
               format: "image/png",
               transparent: true,
               version: "1.3.0",
-              opacity: 0.45
+              opacity: 0.65
             }
           );
         }
@@ -268,7 +268,7 @@
             .then(r => r.json())
             .then(countyData => {
               L.geoJSON(countyData, {
-                style: { color: "#8c864f", weight: 1.4, fillOpacity: 0, dashArray: '10, 10' }
+                style: { color: "#661212", weight: 2.5, fillOpacity: 0, dashArray: '10, 10' }
               }).addTo(map);
             });
 
@@ -280,7 +280,7 @@
                 style: feature => {
                   return {
                     color: feature.properties.stroke || "white",
-                    weight: feature.properties["stroke-width"] || 2,
+                    weight: 5,
                     fillOpacity: 0,
                     dashArray: feature.properties["stroke-dasharray"] || null
                   };
