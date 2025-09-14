@@ -27,11 +27,14 @@
       transition: background-color 0.5s ease;
       z-index: 1000;
     }
-    #map { flex: 1; border-bottom: 4px solid black; }
+    #map {
+      flex: 1;
+      border-bottom: 4px solid black;
+    }
     #info {
       padding: 8px;
       font-family: Arial, sans-serif;
-      font-size: 16px;
+      font-size: 20px;
       text-align: center;
     }
     #clock {
@@ -68,11 +71,9 @@
     <div id="info">Loading location info...</div>
   </div>
   <div id="stormBanner">Loading storm report distance...</div>
-
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     let map, marker, radarLayer, wwaLayer, countyLayer, stormReportsLayer = null;
-    let wLayer;
     let radarMode = "sr_bref";
     let currentRadarStation = null;
 
@@ -118,90 +119,6 @@
       return dirs[Math.round(compass/45)%8];
     }
 
-    // ------------------ Alert Parsing ------------------
-    function getParam(params, key) {
-      if (!params) return undefined;
-      const v = params[key];
-      if (v == null) return undefined;
-      return Array.isArray(v) ? v[0] : v;
-    }
-
-    function parseNumber(str) {
-      if (str == null) return undefined;
-      const m = String(str).match(/-?\d+(\.\d+)?/);
-      return m ? parseFloat(m[0]) : undefined;
-    }
-
-    function capWords(s) {
-      return String(s).toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
-    }
-
-    function buildTags(alert) {
-      const p = alert.properties;
-      const params = p.parameters || {};
-      const event = p.event || "";
-      const pieces = [];
-
-      // Helper to pull number from string or array
-      function getNumber(key) {
-        let val = params[key];
-        if (!val) return undefined;
-        if (Array.isArray(val)) val = val[0];
-        if (typeof val === "string") {
-          const m = val.match(/-?\d+(\.\d+)?/);
-          return m ? parseFloat(m[0]) : undefined;
-        }
-        if (typeof val === "number") return val;
-        return undefined;
-      }
-
-      // Tornado Warning
-      if (/Tornado Warning/i.test(event)) {
-        const torDetect = getParam(params, "tornadoDetection") || "";
-        if (/OBSERVED/i.test(torDetect)) pieces.push("Confirmed");
-        else if (/RADAR/i.test(torDetect)) pieces.push("Radar Indicated");
-
-        const torDamage = getParam(params, "tornadoDamageThreat") || "";
-        if (/CONSIDERABLE|CATASTROPHIC/i.test(torDamage)) pieces.push(capWords(torDamage));
-      }
-
-      // Severe Thunderstorm Warning
-      if (/Severe Thunderstorm Warning/i.test(event)) {
-        const hailNum = getNumber("maxHailSize") ?? getNumber("hailSize");
-        if (hailNum != null) pieces.push(`Hail: ${hailNum.toFixed(2)}"`);
-
-        const windNum = getNumber("windGust") ?? getNumber("maxWindGust");
-        if (windNum != null) pieces.push(`Wind: ${Math.round(windNum)} mph`);
-
-        const torDetect = getParam(params, "tornadoDetection") || "";
-        if (/POSSIBLE/i.test(torDetect)) pieces.push("<br>Tornado Possible");
-        else {
-          const txt = [p.headline, p.description, p.instruction].join(" ");
-          if (/TORNADO\s+POSSIBLE/i.test(txt)) pieces.push("<br>Tornado Possible");
-        }
-
-        const tds = getParam(params, "thunderstormDamageThreat") || "";
-        if (/CONSIDERABLE|DESTRUCTIVE/i.test(tds)) pieces.push(`<br>Damage Threat: ${capWords(tds)}`);
-      }
-
-      return pieces.length ? ` (${pieces.join(" | ")})` : "";
-    }
-
-    function pickPriorityAlert(features) {
-      let best = null, bestScore = -1;
-      for (const f of features) {
-        const ev = f.properties?.event || "";
-        let score = 0;
-        if (/Tornado Warning/i.test(ev)) score = 4;
-        else if (/Severe Thunderstorm Warning/i.test(ev)) score = 3;
-        else if (/Tornado Watch/i.test(ev)) score = 2;
-        else if (/Severe Thunderstorm Watch/i.test(ev)) score = 1;
-        if (score > bestScore) { bestScore = score; best = f; }
-      }
-      return best;
-    }
-
-    // ------------------ Main Weather Info ------------------
     async function getWeatherInfo(lat, lon) {
       const alertsResp = await fetch(`https://api.weather.gov/alerts/active?point=${lat},${lon}`);
       const alertsData = await alertsResp.json();
@@ -209,33 +126,35 @@
       let bgColor = "rgba(255,255,255,0.8)";
       let alertText = "No active severe alerts.";
 
-      if (alertsData.features?.length > 0) {
-        const selected = pickPriorityAlert(alertsData.features);
-        if (selected) {
-          const event = selected.properties.event;
-          let color = bgColor;
-          if (/Tornado Warning/i.test(event)) color = "magenta";
-          else if (/Severe Thunderstorm Warning/i.test(event)) color = "orange";
-          else if (/Tornado Watch/i.test(event)) color = "yellow";
-          else if (/Severe Thunderstorm Watch/i.test(event)) color = "pink";
-          else if (/Flash Flood Warning/i.test(event)) color = "green";
-
-          const tagStr = buildTags(selected);
-          alertText = `${event}<br>${tagStr}`;
-          bgColor = color;
+      if (alertsData.features.length > 0) {
+        let priority = 0;
+        for (const alert of alertsData.features) {
+          const event = alert.properties.event;
+          if (event.includes("Flash Flood Warning")) {
+            bgColor = "green"; alertText = event; priority = 0;
+          }
+          else if (event.includes("Tornado Warning") && priority < 4) {
+            bgColor = "magenta"; alertText = event; priority = 3;
+          }
+          else if (event.includes("Severe Thunderstorm Warning") && priority < 3) {
+            bgColor = "orange"; alertText = event; priority = 2;
+          }
+          else if (event.includes("Tornado Watch") && priority < 2) {
+            bgColor = "yellow"; alertText = event; priority = 1;
+          }
+          else if (event.includes("Severe Thunderstorm Watch") && priority < 1) {
+            bgColor = "pink"; alertText = event; priority = 1;
+          }
         }
       }
-
       document.getElementById("container").style.backgroundColor = bgColor;
       document.getElementById("clock").style.backgroundColor = bgColor;
 
-      // NWS points lookup
       const pointsResp = await fetch(`https://api.weather.gov/points/${lat},${lon}`);
       const pointsData = await pointsResp.json();
       const city = pointsData.properties.relativeLocation.properties.city;
       const state = pointsData.properties.relativeLocation.properties.state;
 
-      // county
       const countyUrl = pointsData.properties.county;
       let countyName = "Unknown";
       try {
@@ -244,11 +163,13 @@
           const countyData = await countyResp.json();
           countyName = countyData.properties.name;
         }
-      } catch(e) { console.warn("county fetch error", e); }
+      } catch(e) {
+        console.warn("county fetch error", e);
+      }
 
-      // radar
-      const radarStation = (pointsData.properties.radarStation || "").toLowerCase();
-      if (radarStation && radarStation !== currentRadarStation) {
+      const radarStation = pointsData.properties.radarStation.toLowerCase();
+
+      if (radarStation !== currentRadarStation) {
         currentRadarStation = radarStation;
         if (radarLayer) map.removeLayer(radarLayer);
         radarLayer = L.tileLayer.wms(
@@ -261,8 +182,10 @@
             version: "1.3.0"
           }
         ).addTo(map);
-      } else if (radarLayer) {
-        radarLayer.setParams({ layers: `${radarStation}_${radarMode}` });
+      } else {
+        if (radarLayer) {
+          radarLayer.setParams({ layers: `${radarStation}_${radarMode}` });
+        }
       }
 
       const cityCoords = pointsData.properties.relativeLocation.geometry.coordinates;
@@ -271,8 +194,8 @@
       const direction = calculateBearing(cityCoords[1], cityCoords[0], lat, lon);
 
       let alertStyle = "";
-      if (/Tornado Warning|Severe Thunderstorm Warning/.test(alertText)) {
-        alertStyle = 'font-weight: bold; font-size: 18px;';
+      if (alertText.includes("Tornado Warning") || alertText.includes("Severe Thunderstorm Warning")) {
+        alertStyle = 'font-weight: bold; font-size: 21px;';
       }
 
       document.getElementById("info").innerHTML = `
@@ -294,13 +217,14 @@
       return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
-    // ------------------ Storm Reports ------------------
     async function loadStormReports() {
       try {
         const resp = await fetch("https://twodogswx.net/stormreports");
         const geojson = await resp.json();
 
-        if (stormReportsLayer) map.removeLayer(stormReportsLayer);
+        if (stormReportsLayer) {
+          map.removeLayer(stormReportsLayer);
+        }
 
         stormReportsLayer = L.geoJSON(geojson, {
           pointToLayer: (feature, latlng) => {
@@ -318,9 +242,11 @@
           }
         }).addTo(map);
 
+        // banner code
         const banner = document.getElementById("stormBanner");
         if (geojson.features.length > 0 && marker) {
-          let closest = null, minDist = Infinity;
+          let closest = null;
+          let minDist = Infinity;
           const userLat = marker.getLatLng().lat;
           const userLon = marker.getLatLng().lng;
 
@@ -328,15 +254,18 @@
             const lat = feature.geometry.coordinates[1];
             const lon = feature.geometry.coordinates[0];
             const d = distance(userLat, userLon, lat, lon);
-            if (d < minDist) { minDist = d; closest = feature; }
+            if (d < minDist) {
+              minDist = d;
+              closest = feature;
+            }
           }
 
           if (closest) {
             const type = closest.properties.event_type;
-            const magnitude = closest.properties.size ?? "N/A";
+            const magnitude = closest.properties.size ?? "Unavaliable";
             const distMi = (minDist * 0.621371).toFixed(1);
-            const LSR_loc = closest.properties.location ?? "Unknown";
-            const LSR_state = closest.properties.state ?? "Unknown";
+            const LSR_loc = closest.properties.location ?? Oooof
+            const LSR_state = closest.properties.state ?? Weeee
             let color = "gray";
             if (type === "tornado") color = "red";
             else if (type === "wind") color = "blue";
@@ -344,8 +273,8 @@
 
             banner.style.backgroundColor = color;
             banner.innerHTML = `
-              Nearest Storm Report: ${type.toUpperCase()} (mag: ${magnitude})
-              at ${Math.round(distMi)} mi away — Near: ${LSR_loc}, ${LSR_state}
+              Nearest Storm Report: ${type.toUpperCase()} (mag: ${parseFloat(magnitude)/100})
+              at ${Math.round(distMi)} mi away Near : ${LSR_loc}, ${LSR_state}
             `;
           }
         } else {
@@ -361,9 +290,11 @@
       }
     }
 
-    // ------------------ Setup ------------------
     function setup() {
-      if (!navigator.geolocation) { alert("Geolocation not supported."); return; }
+      if (!navigator.geolocation) {
+        alert("Geolocation not supported.");
+        return;
+      }
 
       async function updatePosition() {
         navigator.geolocation.getCurrentPosition(async pos => {
@@ -373,48 +304,88 @@
           if (!map) {
             map = L.map('map', { zoomControl: false }).setView([lat, lon], 10);
 
-            L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png").addTo(map);
+            //L.tileLayer("https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png?api_key=93193627-3b89-42b8-b36d-b4f9720a3dac", {}).addTo(map);
+
+            L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png", {}).addTo(map);
 
             map.createPane("labelsPane");
-            map.getPane("labelsPane").style.zIndex = 700;
+            map.getPane("labelsPane").style.zIndex = 700;  // higher than radar/wwa/etc.
 
-            L.tileLayer("https://tiles.stadiamaps.com/tiles/stamen_terrain_lines/{z}/{x}/{y}{r}.png?api_key=93193627-3b89-42b8-b36d-b4f9720a3dac", { pane: "labelsPane" }).addTo(map);
-            L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png", { pane: "labelsPane" }).addTo(map);
+            L.tileLayer("https://tiles.stadiamaps.com/tiles/stamen_terrain_lines/{z}/{x}/{y}{r}.png?api_key=93193627-3b89-42b8-b36d-b4f9720a3dac", {
+              pane: "labelsPane",
+              attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>'}).addTo(map);
+
+            L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png", {
+              pane: "labelsPane",
+              attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>'}).addTo(map);
 
             map.createPane("warningsPane");
             map.getPane("warningsPane").style.zIndex = 650;
 
-            map.createPane("CarIconPane");
-            map.getPane("CarIconPane").style.zIndex = 1650;
 
             const carIcon = L.icon({
               iconUrl: "https://cdn-icons-png.flaticon.com/512/1680/1680219.png",
               iconSize: [40,40],
               iconAnchor: [20,20]
             });
-            marker = L.marker([lat, lon], {icon: carIcon, pane: "CarIconPane"}).addTo(map);
+            marker = L.marker([lat, lon], {icon: carIcon, pane: "warningsPane"}).addTo(map);
 
             wLayer = L.tileLayer.wms(
               "https://mapservices.weather.noaa.gov/eventdriven/services/WWA/watch_warn_adv/MapServer/WMSServer",
-              { layers: "1", format: "image/png", transparent: true, version: "1.3.0", pane: "warningsPane" }
+              {
+                layers: "1",
+                format: "image/png",
+                transparent: true,
+                version: "1.3.0",
+                pane: "warningsPane"
+              }
             ).addTo(map);
 
             wwaLayer = L.tileLayer.wms(
               "https://mapservices.weather.noaa.gov/eventdriven/services/WWA/watch_warn_adv/MapServer/WMSServer",
-              { layers: "0", format: "image/png", transparent: true, version: "1.3.0", opacity: 0.5 }
+              {
+                layers: "0",
+                format: "image/png",
+                transparent: true,
+                version: "1.3.0",
+                opacity: 0.5
+              }
             ).addTo(map);
 
             fetch("https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json")
               .then(r => r.json())
               .then(countyData => {
                 countyLayer = L.geoJSON(countyData, {
-                  style: { color: "#8c864f", weight: 1.4, fillOpacity: 0, dashArray: '10, 10' }
+                  style: {
+                    color: "#8c864f",
+                    weight: 1.4,
+                    fillOpacity: 0,
+                    dashArray: '10, 10'
+                  }
                 }).addTo(map);
               });
           } else {
             marker.setLatLng([lat, lon]);
             map.setView([lat, lon]);
           }
+
+          if (!map.getPane("obsPane")) {
+            map.createPane("obsPane");
+            map.getPane("obsPane").style.zIndex = 640;
+          }
+
+          L.tileLayer.wms(
+            "https://mapservices.weather.noaa.gov/vector/services/obs/surface_obs/MapServer/WMSServer",
+            {
+              layers: ["0","1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20"],
+              format: "image/png",
+              transparent: true,
+              version: "1.3.0",
+			        dpi: 140, // attempt higher DPI
+			        MAP_RESOLUTION: 140,
+              pane: "obsPane"
+            }
+          ).addTo(map);
 
           await getWeatherInfo(lat, lon);
           await loadStormReports();
@@ -423,9 +394,21 @@
 
       updatePosition();
       setInterval(updatePosition, 60 * 1000);
-      setInterval(() => { radarMode = (radarMode === "sr_bref") ? "sr_bvel" : "sr_bref"; }, 1 * 60 * 1000);
-      setInterval(() => { if (map) { const current = map.getCenter(); map.setZoom(8); setTimeout(() => map.setView(current, 10), 30 * 1000); }}, 2 * 60 * 1000);
-      setInterval(() => location.reload(), 5 * 60 * 1000);
+      setInterval(() => {
+        radarMode = (radarMode === "sr_bref") ? "sr_bvel" : "sr_bref";
+      }, 1 * 60 * 1000);
+      setInterval(() => {
+        if (map) {
+          const current = map.getCenter();
+          map.setZoom(8);
+          setTimeout(() => {
+            map.setView(current, 10);
+          }, 30 * 1000);
+        }
+      }, 2 * 60 * 1000);
+      setInterval(() => {
+        location.reload();
+      }, 5 * 60 * 1000);
     }
 
     setup();

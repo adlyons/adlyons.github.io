@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080"/>
+  <title>Live Weather Dashboard - Visible → IR → Radar</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 1920px;
+      height: 1080px;
+      background: transparent;
+      overflow: hidden;
+    }
+
+    /* map sits in the bottom 35% of the page */
+    #map {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 35%;
+      border-top: 4px solid black;
+      z-index: 900;
+    }
+
+    /* top-left UI */
+    #clock {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      padding: 8px 12px;
+      border: 4px solid black;
+      background-color: rgba(255,255,255,0.8);
+      font-family: Arial, sans-serif;
+      font-size: 24px;
+      z-index: 1001;
+      transition: background-color 0.5s ease;
+    }
+
+    #info {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      padding: 8px 12px;
+      border: 4px solid black;
+      background-color: rgba(255,255,255,0.8);
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      z-index: 1001;
+      transition: background-color 0.5s ease;
+      text-align: left;
+      min-width: 260px;
+    }
+  </style>
+</head>
+<body>
+  <div id="clock">Loading clock...</div>
+  <div id="info">Loading location info...</div>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // core state
+    let map = null;
+    let marker = null;
+    let layers = { vis: null, ir: null, radar: null };
+    let modeOrder = ['vis','ir','radar']; // start order: Visible -> IR -> Radar
+    let modeIndex = 0; // start with vis
+    let currentRadarStation = null;
+    let radarMode = "sr_bref"; 
+
+    // clock
+    function updateClock() {
+      const now = new Date();
+      const localTime = now.toLocaleTimeString();
+      const utcTime = now.toUTCString().split(" ")[4];
+      document.getElementById("clock").textContent = `Local: ${localTime} | UTC: ${utcTime}`;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // distance & bearing helpers
+    function distance(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI/180;
+      const dLon = (lon2 - lon1) * Math.PI/180;
+      const a =
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) *
+        Math.sin(dLon/2) * Math.sin(dLon/2);
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+    function calculateBearing(lat1, lon1, lat2, lon2) {
+      const toRad = deg => deg * Math.PI / 180;
+      const toDeg = rad => rad * 180 / Math.PI;
+      const dLon = toRad(lon2 - lon1);
+      const y = Math.sin(dLon) * Math.cos(toRad(lat2));
+      const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+                Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLon);
+      const brng = Math.atan2(y, x);
+      const compass = (toDeg(brng) + 360) % 360;
+      const dirs = ["N","NE","E","SE","S","SW","W","NW"];
+      return dirs[Math.round(compass/45) % 8];
+    }
+
+    // create the satellite and radar layers
+    function ensureSatLayers() {
+      if (!layers.vis) {
+        layers.vis = L.tileLayer.wms('https://mesonet.agron.iastate.edu/cgi-bin/wms/goes/conus_vis.cgi', {
+          layers: 'goes_conus_vis',
+          format: 'image/png',
+          transparent: true,
+          attribution: 'IEM Visible Satellite',
+          opacity: 0.75
+        });
+      }
+      if (!layers.ir) {
+        layers.ir = L.tileLayer.wms('https://mesonet.agron.iastate.edu/cgi-bin/wms/goes/conus_ir.cgi', {
+          layers: 'goes_conus_ir',
+          format: 'image/png',
+          transparent: true,
+          attribution: 'IEM IR Satellite',
+          opacity: 0.75
+        });
+      }
+    }
+
+    function createOrUpdateRadarLayer(radarStation) {
+      if (radarStation) {
+        if (radarStation !== currentRadarStation || !layers.radar) {
+          currentRadarStation = radarStation;
+          if (layers.radar && map && map.hasLayer(layers.radar)) map.removeLayer(layers.radar);
+          layers.radar = L.tileLayer.wms(
+            `https://opengeo.ncep.noaa.gov/geoserver/${radarStation}/wms`,
+            {
+              layers: `${radarStation}_${radarMode}`,
+              format: "image/png",
+              transparent: true,
+              version: "1.3.0",
+              opacity: 0.45
+            }
+          );
+        } else {
+          try {
+            if (layers.radar && typeof layers.radar.setParams === "function") {
+              layers.radar.setParams({ layers: `${radarStation}_${radarMode}` });
+            }
+          } catch(e) {}
+        }
+      } else {
+        if (!layers.radar || (currentRadarStation && layers.radar)) {
+          if (layers.radar && map && map.hasLayer(layers.radar)) map.removeLayer(layers.radar);
+          currentRadarStation = null;
+          layers.radar = L.tileLayer.wms(
+            `https://opengeo.ncep.noaa.gov/geoserver/nexrad-n0q/wms`,
+            {
+              layers: `nexrad-n0q`,
+              format: "image/png",
+              transparent: true,
+              version: "1.3.0",
+              opacity: 0.45
+            }
+          );
+        }
+      }
+    }
+
+    function switchToMode(key) {
+      if (!map) return;
+      ['vis','ir','radar'].forEach(k => {
+        if (layers[k] && map.hasLayer(layers[k])) map.removeLayer(layers[k]);
+      });
+      const layer = layers[key];
+      if (layer) layer.addTo(map);
+    }
+
+    async function getWeatherInfoAndLayers(lat, lon) {
+      try {
+        const pointsResp = await fetch(`https://api.weather.gov/points/${lat},${lon}`);
+        const pointsData = await pointsResp.json();
+
+        const city = pointsData.properties.relativeLocation.properties.city;
+        const state = pointsData.properties.relativeLocation.properties.state;
+        const countyUrl = pointsData.properties.county;
+        let countyName = "Unknown";
+        try {
+          const countyResp = await fetch(countyUrl);
+          if (countyResp.ok) {
+            const countyData = await countyResp.json();
+            countyName = countyData.properties.name;
+          }
+        } catch(e) {}
+
+        const radarStation = (pointsData.properties.radarStation || "").toLowerCase() || null;
+        ensureSatLayers();
+        createOrUpdateRadarLayer(radarStation);
+
+        const cityCoords = pointsData.properties.relativeLocation.geometry.coordinates;
+        const distKm = distance(lat, lon, cityCoords[1], cityCoords[0]);
+        const distMi = (distKm * 0.621371).toFixed(1);
+        const direction = calculateBearing(cityCoords[1], cityCoords[0], lat, lon);
+
+        document.getElementById("info").innerHTML = `
+          <strong>County:</strong> ${countyName} <br>
+          <strong>Nearest City:</strong> ${city}, ${state} <br>
+          <strong>Distance/Direction:</strong> ${distMi} mi ${direction}
+        `;
+      } catch (err) { console.warn("points fetch failed", err); }
+    }
+
+    function setup() {
+      if (!navigator.geolocation) { alert("Geolocation not supported."); return; }
+
+      navigator.geolocation.getCurrentPosition(async pos => {
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+
+        if (!map) {
+          map = L.map('map', { zoomControl: false }).setView([lat, lon], 7);
+
+          // basemap
+          L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png").addTo(map);
+
+          map.createPane("labelsPane");
+          map.getPane("labelsPane").style.zIndex = 700;
+          L.tileLayer("https://tiles.stadiamaps.com/tiles/stamen_terrain_lines/{z}/{x}/{y}{r}.png?api_key=93193627-3b89-42b8-b36d-b4f9720a3dac", { pane: "labelsPane" }).addTo(map);
+          L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png", { pane: "labelsPane" }).addTo(map);
+
+          map.createPane("warningsPane");
+          map.getPane("warningsPane").style.zIndex = 650;
+
+          map.createPane("CarIconPane");
+          map.getPane("CarIconPane").style.zIndex = 1650;
+
+
+          if (!map.getPane("obsPane")) {
+            map.createPane("obsPane");
+            map.getPane("obsPane").style.zIndex = 640;
+          }
+
+
+          L.tileLayer.wms(
+            "https://mapservices.weather.noaa.gov/vector/services/obs/surface_obs/MapServer/WMSServer",
+            {
+              layers: ["0","1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20"],
+              format: "image/png",
+              transparent: true,
+              version: "1.3.0",
+              dpi: 150, // attempt higher DPI
+              MAP_RESOLUTION: 340,
+              pane: "obsPane"
+            }
+          ).addTo(map);
+
+          L.tileLayer.wms(
+            "https://mapservices.weather.noaa.gov/eventdriven/services/WWA/watch_warn_adv/MapServer/WMSServer",
+            { layers: "1", format: "image/png", transparent: true, version: "1.3.0", pane: "warningsPane" }
+          ).addTo(map);
+          L.tileLayer.wms(
+            "https://mapservices.weather.noaa.gov/eventdriven/services/WWA/watch_warn_adv/MapServer/WMSServer",
+            { layers: "0", format: "image/png", transparent: true, version: "1.3.0", opacity: 0.5, pane: "warningsPane" }
+          ).addTo(map);
+
+          fetch("https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json")
+            .then(r => r.json())
+            .then(countyData => {
+              L.geoJSON(countyData, {
+                style: { color: "#8c864f", weight: 1.4, fillOpacity: 0, dashArray: '10, 10' }
+              }).addTo(map);
+            });
+
+          // ---- ADD SPC OUTLOOK LAYER (use official stroke colors) ----
+          fetch("https://www.spc.noaa.gov/products/outlook/day1otlk_cat.nolyr.geojson")
+            .then(resp => resp.json())
+            .then(data => {
+              L.geoJSON(data, {
+                style: feature => {
+                  return {
+                    color: feature.properties.stroke || "white",
+                    weight: feature.properties["stroke-width"] || 2,
+                    fillOpacity: 0,
+                    dashArray: feature.properties["stroke-dasharray"] || null
+                  };
+                }
+              }).addTo(map);
+            });
+
+          const carIcon = L.icon({
+            iconUrl: "https://cdn-icons-png.flaticon.com/512/1680/1680219.png",
+            iconSize: [40,40],
+            iconAnchor: [20,20]
+          });
+          marker = L.marker([lat, lon], {icon: carIcon, pane: "CarIconPane"}).addTo(map);
+
+          ensureSatLayers();
+        } else {
+          marker.setLatLng([lat, lon]);
+          map.setView([lat, lon]);
+        }
+
+        await getWeatherInfoAndLayers(lat, lon);
+
+        modeIndex = 0;
+        switchToMode(modeOrder[modeIndex]);
+
+      }, console.error, { enableHighAccuracy: true });
+
+      // periodic updates...
+      setInterval(() => {
+        navigator.geolocation.getCurrentPosition(async pos => {
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
+          if (marker) marker.setLatLng([lat, lon]);
+          if (map) map.setView([lat, lon]);
+          await getWeatherInfoAndLayers(lat, lon);
+        }, console.error, { enableHighAccuracy: true });
+      }, 60*1000);
+
+      setInterval(() => {
+        modeIndex = (modeIndex + 1) % modeOrder.length;
+        const next = modeOrder[modeIndex];
+        if (next === 'radar') createOrUpdateRadarLayer(currentRadarStation);
+        switchToMode(next);
+      }, 60*1000);
+
+      setInterval(() => {
+        radarMode = (radarMode === "sr_bref") ? "sr_bvel" : "sr_bref";
+        try {
+          if (layers.radar && currentRadarStation && typeof layers.radar.setParams === "function") {
+            layers.radar.setParams({ layers: `${currentRadarStation}_${radarMode}` });
+          }
+        } catch(e) {}
+      }, 60*1000);
+
+      setInterval(() => location.reload(), 5 * 60 * 1000);
+    }
+
+    setup();
+  </script>
+</body>
+</html>
