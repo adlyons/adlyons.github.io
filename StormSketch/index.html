@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>StormSketchV0.5</title>
+<style>
+body { margin: 0; overflow: hidden; font-family: sans-serif; }
+
+/* ------------------ NEW MAP CONTAINER STYLES ------------------ */
+
+#mapContainer {
+    position: absolute;
+    top: 50px; /* Leave space for the toolbar/banner */
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80vw; /* Initial size of the visible map area */
+    height: 80vh; 
+    border: 1px solid #ccc;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+    overflow: auto; /* Allows scrolling if map is larger than container */
+    background: #f0f0f0; /* Default background */
+    cursor: grab; /* Indicates it can be moved/scrolled */
+    /* Add a subtle resize handle or just rely on browser window resize */
+    resize: both; 
+    min-width: 300px;
+    min-height: 200px;
+    z-index: 50; /* Below toolbar, above map */
+}
+
+/* The map image itself */
+#mapContainer img {
+    display: none; /* Hidden until loaded */
+    width: auto; /* Allow image to determine natural width */
+    height: auto; /* Allow image to determine natural height */
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+/* The SVG overlay must match the exact size of the image/map */
+#canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%; /* Initially 100% of the image size */
+    height: 100%; /* Initially 100% of the image size */
+    cursor: crosshair; 
+    /* Remove default svg background */
+    background: transparent !important; 
+    display: block; 
+}
+
+/* ------------------ TOOLBAR STYLES (Unchanged) ------------------ */
+
+#toolbar { 
+    position: fixed; /* Fixed position so it doesn't scroll with map */
+    top: 10px; 
+    left: 10px; 
+    background: white; 
+    padding: 10px; 
+    border-radius: 6px; 
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2); 
+    z-index: 100; 
+    display: grid;
+    grid-template-columns: repeat(4, auto);
+    gap: 8px; 
+    transition: width 0.3s ease, height 0.3s ease, padding 0.3s ease, transform 0.3s ease;
+}
+#toolbar button, #toolbar label { 
+    margin: 0; 
+    padding: 8px 10px; 
+    white-space: nowrap;
+    text-align: center;
+    cursor: pointer;
+    border: 1px solid #ccc; 
+    border-radius: 4px;
+    background: #f8f8f8;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.05);
+    min-width: 0; 
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+/* Row 3 layout */
+#undoBtn, #eraseBtn, #loadMapLabel, #downloadBtn {
+    grid-column: span 1;
+}
+
+/* Hide the actual file input */
+#fileInput {
+    display: none;
+}
+
+/* ------------------ MINIMIZE/MAXIMIZE CSS (Adjusted position) ------------------ */
+
+#toggleBtn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    background: #f00; 
+    color: white;
+    border: none;
+    border-radius: 0 6px 0 6px;
+    line-height: 1;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: none; 
+    z-index: 101; 
+    transition: background 0.3s ease;
+}
+
+#toolbar.minimized {
+    width: 38px; 
+    height: 38px; 
+    padding: 5px; 
+    overflow: hidden;
+    display: block; 
+}
+
+#toolbar.minimized > * {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none; 
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+#toolbar.minimized #toggleBtn {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    background: #090; 
+    border-radius: 6px; 
+    width: 28px;
+    height: 28px;
+    top: 5px;
+    right: 5px;
+    transform: none; 
+}
+
+#toolbar:not(.minimized) {
+    display: grid;
+}
+
+/* ------------------ BANNER (Unchanged) ------------------ */
+
+#selected-front-banner {
+    position: fixed; /* Fixed position */
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #444; 
+    color: white;
+    padding: 8px 15px;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: bold;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease-in-out;
+    z-index: 99;
+}
+#selected-front-banner.show {
+    opacity: 1;
+    visibility: visible;
+}
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <button id="toggleBtn" title="Minimize/Maximize" style="grid-column: span 4; text-align: right;">X</button>
+  
+  <button id="coldBtn">Cold Front</button>
+  <button id="warmBtn">Warm Front</button>
+  <button id="drylineBtn">Dryline</button>
+  <button id="stationaryBtn">Stationary Front</button>
+  
+  <button id="occludedBtn">Occluded Front</button>
+  <button id="troughBtn">Trough</button>
+  <button id="lowBtn" style="color: red; font-weight: bold;">Low (L)</button>
+  <button id="highBtn" style="color: blue; font-weight: bold;">High (H)</button>
+  
+  <button id="undoBtn">Undo</button>
+  <button id="eraseBtn">Erase All</button>
+  
+  <input type="file" id="fileInput" accept="image/*" />
+  <label for="fileInput" id="loadMapLabel">Load Map</label>
+  
+  <button id="downloadBtn" style="background: #e6e6e6; font-weight: bold;">Download Map (SVG)</button>
+  
+</div>
+
+<div id="selected-front-banner">Selected: <span id="current-front-name">Cold Front</span></div>
+
+<div id="mapContainer">
+    <svg id="canvas">
+        <defs>
+            <g id="coldFrontSymbol" fill="blue" stroke="blue" stroke-width="3">
+                <path d="M 0 -20 L 0 5" stroke="blue" stroke-width="3" fill="none"/>
+                <path d="M 0,-15 L 0,15 L 25,0 Z"/>
+            </g>
+            <g id="warmFrontSymbol" fill="red" stroke="red" stroke-width="3">
+                <path d="M 0 -20 L 0 5" stroke="red" stroke-width="3" fill="none"/>
+                <path d="M 0,-15 A 15,15 0 0,1 0,15 Z"/>
+            </g>
+            <g id="DrylineFrontSymbol" fill="none" stroke="#753416" stroke-width="3">
+                <path d="M 0,-15 A 15,15 0 0,1 0,15 Z"/>
+            </g>
+            
+            <g id="stationaryFrontSymbol" fill="none" stroke-width="3">
+                <path d="M 0 -20 L 0 5" stroke="blue" stroke-width="3" fill="none"/>
+                <path d="M 0 0 L 0 35" stroke="red" stroke-width="5" fill="none"/>
+                <path d="M 0,-15 L 10,-10 L 0,-5 Z" fill="blue" stroke="blue"/>
+                <path d="M 0,5 A 5,5 0 1,0 0,25" fill="red" stroke="red" />
+            </g>
+            
+            <g id="occludedFrontSymbol" fill="none" stroke="purple" stroke-width="3">
+                <path d="M 0 -20 L 0 20" stroke="purple" stroke-width="3" fill="none"/>
+                <path d="M 0,-15 L 10,-10 L 0,-5 Z" fill="purple" stroke="purple"/>
+                <path d="M 0,0 A 5,5 0 0,0 0,15" fill="purple" stroke="purple" transform="translate(-0, 15) rotate(-180)"/>
+            </g>
+            
+            <text id="lowPressureSymbol" x="0" y="0" font-size="30" font-weight="bold" fill="red" text-anchor="middle" dominant-baseline="central">L</text>
+            <text id="highPressureSymbol" x="0" y="0" font-size="30" font-weight="bold" fill="blue" text-anchor="middle" dominant-baseline="central">H</text>
+
+        </defs>
+        </svg>
+</div>
+
+<script>
+const svg = document.getElementById("canvas");
+const mapContainer = document.getElementById("mapContainer");
+const fileInput = document.getElementById("fileInput");
+const downloadBtn = document.getElementById("downloadBtn");
+const toolbar = document.getElementById("toolbar");
+const toggleBtn = document.getElementById("toggleBtn");
+
+// Variables for the background image element
+let currentMapImage = null; 
+
+let drawing = false;
+let currentSymbol = "coldFrontSymbol";
+
+const banner = document.getElementById('selected-front-banner');
+const frontNameSpan = document.getElementById('current-front-name');
+
+// Map symbol IDs to display names (unchanged)
+const frontDisplayNames = {
+    "coldFrontSymbol": "Cold Front",
+    "warmFrontSymbol": "Warm Front",
+    "DrylineFrontSymbol": "Dryline",
+    "stationaryFrontSymbol": "Stationary Front",
+    "occludedFrontSymbol": "Occluded Front",
+    "trough": "Trough",
+    "low": "Low Pressure (L)",
+    "high": "High Pressure (H)"
+};
+
+// ... (Functions updateBanner, setFront, Toolbar switching, Erase, Minimize/Maximize logic are unchanged) ...
+
+function updateBanner(symbolId) {
+    const displayName = frontDisplayNames[symbolId] || "Unknown Front";
+    frontNameSpan.textContent = displayName;
+    
+    banner.classList.add('show');
+    clearTimeout(banner.hideTimeout);
+    banner.hideTimeout = setTimeout(() => {
+        banner.classList.remove('show');
+    }, 2000); 
+}
+
+function setFront(symbolId) {
+    currentSymbol = symbolId;
+    updateBanner(symbolId);
+}
+
+updateBanner(currentSymbol);
+
+document.getElementById("coldBtn").addEventListener("click", () => setFront("coldFrontSymbol"));
+document.getElementById("warmBtn").addEventListener("click", () => setFront("warmFrontSymbol"));
+document.getElementById("drylineBtn").addEventListener("click", () => setFront("DrylineFrontSymbol"));
+document.getElementById("stationaryBtn").addEventListener("click", () => setFront("stationaryFrontSymbol"));
+document.getElementById("occludedBtn").addEventListener("click", () => setFront("occludedFrontSymbol"));
+document.getElementById("troughBtn").addEventListener("click", () => setFront("trough"));
+document.getElementById("lowBtn").addEventListener("click", () => setFront("low"));
+document.getElementById("highBtn").addEventListener("click", () => setFront("high"));
+
+document.getElementById("eraseBtn").addEventListener("click", () => {
+    svg.querySelectorAll("g.frontGroup").forEach(el => el.remove());
+    svg.querySelectorAll("text.pressureCenter").forEach(el => el.remove());
+});
+
+toggleBtn.addEventListener('click', () => {
+    toolbar.classList.toggle('minimized');
+    if (toolbar.classList.contains('minimized')) {
+        toggleBtn.textContent = '+'; 
+    } else {
+        toggleBtn.textContent = 'X'; 
+    }
+});
+
+// === UPDATED IMAGE UPLOAD LOGIC ===
+fileInput.addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            // 1. Remove previous image
+            if (currentMapImage) {
+                currentMapImage.remove();
+            }
+
+            // 2. Create and insert the new image element
+            currentMapImage = document.createElement('img');
+            currentMapImage.src = event.target.result;
+            currentMapImage.style.display = 'block'; 
+            currentMapImage.id = 'mapImage'; // Give it an ID for easy reference
+
+            // 3. Insert the image BEFORE the SVG
+            mapContainer.insertBefore(currentMapImage, svg);
+            
+            // 4. Wait for the image to load to get its dimensions
+            currentMapImage.onload = () => {
+                const width = currentMapImage.naturalWidth;
+                const height = currentMapImage.naturalHeight;
+                
+                // 5. Resize both the image and the SVG
+                // The image determines the size of the drawing canvas
+                currentMapImage.style.width = `${width}px`;
+                currentMapImage.style.height = `${height}px`;
+
+                svg.style.width = `${width}px`;
+                svg.style.height = `${height}px`;
+
+                // Set the SVG viewBox to match dimensions for vector scaling
+                svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+            };
+        };
+        reader.readAsDataURL(file);
+    }
+});
+// =============================
+
+
+// === UPDATED SVG DOWNLOAD LOGIC ===
+downloadBtn.addEventListener("click", () => {
+    if (!currentMapImage) {
+        alert("Please load a map image first before downloading.");
+        return;
+    }
+    
+    // Create an <image> element that points to the loaded map
+    const mapImageElement = currentMapImage;
+    const background_image_for_svg = document.createElementNS("http://www.w3.org/2000/svg", "image");
+    
+    // Must use the base64 source from the current map image
+    background_image_for_svg.setAttribute("href", mapImageElement.src);
+    
+    const width = mapImageElement.clientWidth;
+    const height = mapImageElement.clientHeight;
+
+    background_image_for_svg.setAttribute("width", width);
+    background_image_for_svg.setAttribute("height", height);
+    background_image_for_svg.setAttribute("x", 0);
+    background_image_for_svg.setAttribute("y", 0);
+    
+    // Prepend the image element to the SVG content so it's the background
+    svg.prepend(background_image_for_svg); 
+    
+    // 1. Serialize the SVG content
+    const serializer = new XMLSerializer();
+    let source = serializer.serializeToString(svg);
+    
+    // 2. Add namespace, XML declaration, and ensure proper scaling
+    source = source.replace('<svg', 
+        `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg"`);
+    
+    if (!source.match(/^<\?xml/)) {
+        source = '<?xml xml version="1.0" standalone="no"?>\r\n' + source;
+    }
+
+    // 3. Clean up the live SVG DOM by removing the temporary image element
+    background_image_for_svg.remove(); 
+
+    // 4. Create a data URL and a temporary link
+    const url = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(source);
+    
+    const downloadLink = document.createElement("a");
+    downloadLink.href = url;
+    downloadLink.download = "weather_map_with_background.svg"; 
+
+    // 5. Trigger download
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+});
+// =============================
+
+
+// Current path info (Drawing logic is unchanged)
+let pathData = "";
+let currentPathGroup = null;
+
+svg.addEventListener("mousedown", e => {
+    drawing = false; 
+
+    if (currentSymbol === "low" || currentSymbol === "high") {
+        const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+        const symbolId = currentSymbol === "low" ? "lowPressureSymbol" : "highPressureSymbol";
+        
+        // e.offsetX/Y is relative to the SVG, which is correct
+        use.setAttribute("href", `#${symbolId}`);
+        use.setAttribute("x", e.offsetX);
+        use.setAttribute("y", e.offsetY);
+        use.classList.add("pressureCenter"); 
+        
+        const pressureGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        pressureGroup.classList.add("frontGroup"); 
+        pressureGroup.appendChild(use);
+        svg.appendChild(pressureGroup);
+
+    } else {
+        drawing = true;
+        pathData = `M${e.offsetX},${e.offsetY}`;
+
+        currentPathGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        currentPathGroup.classList.add("frontGroup");
+        svg.appendChild(currentPathGroup);
+
+        const newPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        newPath.setAttribute("d", pathData);
+        newPath.setAttribute("fill", "none");
+        newPath.setAttribute("stroke-width", 5);
+
+        let strokeColor = "blue";
+        let useSymbols = true;
+        let strokeDash = "none";
+
+        if (currentSymbol === "warmFrontSymbol") strokeColor = "red";
+        else if (currentSymbol === "DrylineFrontSymbol") strokeColor = "#753416";
+        else if (currentSymbol === "occludedFrontSymbol") strokeColor = "purple";
+        else if (currentSymbol === "trough") {
+            strokeColor = "black";
+            strokeDash = "45, 40";
+            useSymbols = false;
+        }
+
+        newPath.setAttribute("stroke", strokeColor);
+        newPath.setAttribute("stroke-dasharray", strokeDash);
+        currentPathGroup.appendChild(newPath);
+
+        if (useSymbols) {
+            const symbolsGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+            currentPathGroup.appendChild(symbolsGroup);
+            currentPathGroup.symbolsGroup = symbolsGroup;
+        } else {
+            currentPathGroup.symbolsGroup = null;
+        }
+        
+        currentPathGroup.path = newPath;
+        currentPathGroup.symbolId = currentSymbol;
+    }
+});
+
+svg.addEventListener("mousemove", e => {
+    if (!drawing) return;
+    
+    if (currentSymbol !== "low" && currentSymbol !== "high") {
+        pathData += ` L${e.offsetX},${e.offsetY}`;
+        currentPathGroup.path.setAttribute("d", pathData);
+        
+        if (currentPathGroup.symbolsGroup) {
+            placeSymbols(currentPathGroup.path, currentPathGroup.symbolsGroup, currentPathGroup.symbolId);
+        }
+    }
+});
+
+svg.addEventListener("mouseup", () => { drawing = false; });
+
+function placeSymbols(path, symbolsGroup, symbolId) {
+    symbolsGroup.innerHTML = "";
+    const pathLength = path.getTotalLength();
+
+    let spacing = 60;
+    if (symbolId === "DrylineFrontSymbol") spacing = 30;
+    else if (symbolId === "occludedFrontSymbol") spacing =50;
+    else spacing =60;
+
+    for (let dist = 0; dist < pathLength; dist += spacing) {
+        const pt = path.getPointAtLength(dist);
+        const pt2 = path.getPointAtLength(Math.min(dist + 0.1, pathLength));
+        let angle = Math.atan2(pt2.y - pt.y, pt2.x - pt.x) * 180 / Math.PI;
+        angle -= 90;
+
+        const use = document.createElementNS("http://www.w3.org/2000/svg","use");
+        use.setAttribute("href", `#${symbolId}`); 
+        use.setAttribute("transform", `translate(${pt.x},${pt.y}) rotate(${angle})`);
+        symbolsGroup.appendChild(use);
+    }
+}
+
+document.getElementById("undoBtn").addEventListener("click", () => {
+    const allGroups = svg.querySelectorAll("g.frontGroup");
+    if (allGroups.length > 0) {
+        allGroups[allGroups.length - 1].remove();
+    }
+});
+</script>
+</body>
+</html>
