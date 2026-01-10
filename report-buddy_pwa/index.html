@@ -1,0 +1,1462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#000000">
+  <title>Report Buddy V0.5</title>
+  
+  <link rel="manifest" href="./manifest.json">
+  
+  <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/google/material-design-icons/master/png/action/camera_enhance/materialicons/48dp/2x/baseline_camera_enhance_white_48dp.png">
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <style>
+    html,body{margin:0;padding:0;height:100%;background:#000;color:#fff;font-family:sans-serif;overscroll-behavior:none}
+    #app{position:relative;width:100vw;height:100vh;overflow:visible}
+    #reportbuddy{position:absolute;top:0.3%;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.5);padding:.1rem .3rem;border-radius:2px;font-size:.65rem;line-height:1.25;z-index:100}
+
+    #videoContainer{position:relative;width:100%;height:100%;overflow:hidden}
+
+    #video{width:100%;height:100%;object-fit:cover}
+
+    #map{position:absolute;bottom:3.5rem;right:.2rem;width:30vw;height:20vh;min-width:120px;min-height:100px;border:2px solid #fff;border-radius:8px;overflow:hidden;z-index:20}
+
+    #geoInfo{position:absolute;bottom:1vh;left:1rem;background:rgba(0,0,0,.6);padding:.4rem .6rem;border-radius:8px;font-size:.85rem;line-height:1.25;z-index:20;pointer-events:none;max-width:95vw}
+
+    #eventSelector{position:absolute;top:5%;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.6);padding:.5rem 1rem;border-radius:10px;z-index:25;font-size:1.45rem;font-weight:bold;text-align:center; white-space: nowrap; overflow: visible; text-overflow: ellipsis; max-width: 100%;}
+
+    #eventSelector select{background:transparent;color:#fff;font-size:1.4rem;border:none;outline:none;appearance:none; max-width: 90vw; text-align: center; box-sizing: border-box; white-space: nowrap; overflow: visible; text-overflow: ellipsis;}
+
+    #hailSizeSelector{position:absolute;top:15%;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.6);padding:.5rem 1rem;border-radius:10px;z-index:25;font-size:1.25rem;font-weight:bold;text-align:center;display:none}
+
+    #hailSizeSelector select{background:transparent;color:#fff;font-size:1.25rem;border:none;outline:none;appearance:none}
+
+    #customHailInput{position:absolute;top:25%;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.6);padding:.5rem 1rem;border-radius:10px;z-index:25;font-size:1.25rem;font-weight:bold;text-align:center;display:none}
+
+    #customHailInput input{background:transparent;color:#fff;font-size:1.25rem;border:1px solid #fff;border-radius:5px;outline:none;padding:.3rem .5rem;text-align:center;width:200px}
+
+    #damageInput{position:absolute;top:15%;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.6);padding:.5rem 1rem;border-radius:10px;z-index:25;font-size:1.25rem;font-weight:bold;text-align:center;display:none}
+
+    #damageInput input{background:transparent;color:#fff;font-size:1.25rem;border:1px solid #fff;border-radius:5px;outline:none;padding:.3rem .5rem;text-align:center;width:200px}
+
+    #zoomIn{position:absolute;bottom:calc(3.5rem + 20vh + 10px);right:.2rem;width:35px;height:35px;border:2px solid #fff;border-radius:6px;background:rgba(0,0,0,.6);color:#fff;font-size:1.2rem;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;z-index:25}
+
+    #zoomOut{position:absolute;bottom:calc(3.5rem + 20vh + 10px);right:calc(.2rem + 30vw - 35px);width:35px;height:35px;border:2px solid #fff;border-radius:6px;background:rgba(0,0,0,.6);color:#fff;font-size:1.2rem;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;z-index:25}
+
+    #zoomIn:active, #zoomOut:active{background:rgba(255,255,255,.3)}
+
+    #captureBtn{position:absolute;bottom:8%;left:50%;transform:translateX(-50%);width:50px;height:50px;border:4px solid #fff;border-radius:50%;background:rgba(255,255,255,.2);z-index:25;cursor:pointer}
+
+    #captureBtn:active{background:rgba(255,255,255,.4)}
+
+    #snapshot{position:absolute;inset:0;background:rgba(0,0,0,.85);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:40}
+    #snapshot img{max-width:100%;max-height:80%;border:4px solid #fff;border-radius:8px}
+    #snapshot .button-container{display:flex;gap:1rem;margin-top:1rem}
+    #snapshot button{padding:.5rem 1rem;font-size:1rem;border:none;border-radius:6px;background:#fff;cursor:pointer}
+    #loader{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);z-index:30}
+
+    #tweetPanel{position:fixed;top:0;right:-100vw;width:98vw;height:100vh;background:rgba(0,0,0,.95);color:#fff;z-index:100;display:flex;align-items:center;justify-content:center;transition:right .3s ease; box-sizing: border-box; padding: 1rem; }
+    #tweetPanel.open{right:0}
+    #tweetContent{text-align:center;max-width:88vw; box-sizing: border-box;}
+    #tweetText{width:88vw;height:30vh;font-size:1rem;padding:1rem;background:#111;color:#0f0;border:1px solid #888;border-radius:10px;resize:none;margin-bottom:1rem}
+    #charCounter{color:#fff;font-size:0.9rem;margin-bottom:1rem;text-align:center}
+    #tweetPanel button{padding:.5rem 1rem;font-size:1rem;background:#fff;color:#000;border:none;border-radius:5px;cursor:pointer}
+
+
+    #locationMapPanel {
+      position: fixed;
+      top: 0;
+      left: -100%;
+      width: 100vw;
+      height: 100vh;
+      background: #000;
+      color: #fff;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: left 0.3s ease;
+    }
+    #locationMapPanel.open {
+      left: 0;
+    }
+
+
+    #locationMapContainer {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      max-width: 100vw;
+      max-height: 100vh;
+    }
+
+    #locationMap {
+      height: 40%;
+      width: 100%;
+      background: #222;
+      flex-shrink: 0;
+    }
+
+    #locationContent {
+      flex: 1;
+      padding: 1.5rem 1rem;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      max-height: 60%;
+    }
+
+    #modeSwitchBtn {
+      position: fixed;
+      bottom: 65px;
+      left: 20px;
+      padding: 0.5rem 1rem;
+      background: rgba(0, 0, 0, 0.6);
+      color: #fff;
+      border: 2px solid #fff;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: bold;
+      cursor: pointer;
+      z-index: 25;
+    }
+    #modeSwitchBtn:active {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    #howToReportBtn {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      padding: 0.5rem 1rem;
+      background: rgba(0, 0, 0, 0.6);
+      color: #fff;
+      border: 2px solid #fff;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: bold;
+      cursor: pointer;
+      z-index: 25;
+    }
+    #howToReportBtn:active {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    #recordBtn {
+      position: absolute;
+      bottom: 8%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 50px;
+      height: 50px;
+      border: 4px solid #fff;
+      border-radius: 50%;
+      background: #fff;
+      z-index: 25;
+      cursor: pointer;
+      display: none;
+      transition: all 0.2s ease;
+    }
+    #recordBtn::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 20px;
+      height: 20px;
+      background: #ff0000;
+      border-radius: 50%;
+      transition: all 0.3s ease;
+    }
+    #recordBtn:hover {
+      transform: translateX(-50%) scale(1.05);
+    }
+    #recordBtn.recording {
+      animation: recordPulse 1.5s infinite;
+    }
+    #recordBtn.recording::before {
+      width: 25px;
+      height: 25px;
+      border-radius: 3px;
+      background: #ff0000;
+    }
+    #recordBtn:active {
+      transform: translateX(-50%) scale(0.95);
+    }
+
+    @keyframes recordPulse {
+      0% {
+        box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7),
+                    0 0 20px rgba(255, 0, 0, 0.5);
+      }
+      50% {
+        box-shadow: 0 0 0 20px rgba(255, 0, 0, 0),
+                    0 0 30px rgba(255, 0, 0, 0.7);
+      }
+      100% {
+        box-shadow: 0 0 0 0 rgba(255, 0, 0, 0),
+                    0 0 20px rgba(255, 0, 0, 0.5);
+      }
+    }
+
+    #recordTimer {
+      position: absolute;
+      bottom: 16%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.6);
+      color: #fff;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      display: none;
+      z-index: 25;
+      border: 2px solid #fff;
+      font-family: 'Courier New', monospace;
+      letter-spacing: 1px;
+    }
+
+    @keyframes timerGlow {
+      0%, 100% {
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+      }
+      50% {
+        box-shadow: 0 4px 20px rgba(255, 0, 0, 0.6);
+      }
+    }
+
+    @keyframes blink {
+      0%, 50% {
+        opacity: 1;
+      }
+      51%, 100% {
+        opacity: 0.3;
+      }
+    }
+
+    #videoPreview {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 40;
+    }
+    #videoPreview video {
+      max-width: 100%;
+      max-height: 80%;
+      border: 4px solid #fff;
+      border-radius: 8px;
+    }
+    #videoPreview .button-container {
+      display: flex;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    #videoPreview button {
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      border: none;
+      border-radius: 6px;
+      background: #fff;
+      cursor: pointer;
+    }
+
+    #howToReportPanel {
+      position: fixed;
+      top: 0;
+      left: -100%;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.95);
+      color: #fff;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: left 0.3s ease;
+      overflow-y: auto;
+    }
+    #howToReportPanel.open {
+      left: 0;
+    }
+
+    #howToReportContent {
+      max-width: 90vw;
+      max-height: 85vh;
+      overflow-y: auto;
+      padding: 1.5rem 1rem 3rem 1rem;
+      text-align: left;
+    }
+
+    #howToReportContent h2 {
+      color: #ff6b6b;
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+      text-align: center;
+    }
+
+    #howToReportContent h3 {
+      color: #4ecdc4;
+      font-size: 1.2rem;
+      margin-top: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    #howToReportContent ul {
+      margin-left: 1.5rem;
+      line-height: 1.6;
+    }
+
+    #howToReportContent .important {
+      background: rgba(255, 107, 107, 0.2);
+      padding: 0.5rem;
+      border-left: 4px solid #ff6b6b;
+      margin: 1rem 0;
+    }
+
+    #howToReportContent .tip {
+      background: rgba(78, 205, 196, 0.2);
+      padding: 0.5rem;
+      border-left: 4px solid #4ecdc4;
+      margin: 1rem 0;
+    }
+
+    #howToReportClose {
+      display: block;
+      margin: 2rem auto 0;
+      padding: 0.5rem 2rem;
+      background: #fff;
+      color: #000;
+      border: none;
+      border-radius: 5px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+
+    #notification {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(255, 0, 0, 0.9);
+      color: #fff;
+      padding: 1.5rem 2rem;
+      border-radius: 15px;
+      font-size: 1.2rem;
+      font-weight: bold;
+      text-align: center;
+      z-index: 200;
+      display: none;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      animation: fadeIn 0.3s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+      to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    }
+
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="videoContainer"><video id="video" autoplay playsinline muted></video><div id="loader">Loading camera…</div></div>
+    <div id="map"></div>
+    <button id="zoomIn">+</button>
+    <button id="zoomOut">−</button>
+    <div id="geoInfo">Locating…</div>
+    <div id="reportbuddy">Report Buddy v0.5</div>
+
+    <div id="eventSelector">
+      <label for="eventType"></label>
+      <select id="eventType">
+        <option value="">Select Report Type</option>
+        <option value="Tornado">Tornado</option>
+        <option value="Funnel Cloud">Funnel Cloud</option>
+        <option value="Wall Cloud">Wall Cloud</option>
+        <option value="Hail">Hail</option>
+        <option value="Damage">Damage</option>
+        <option value="Flooding">Flooding</option>
+        <option value="Wild Fire">Wild Fire</option>
+      </select>
+    </div>
+
+    <div id="hailSizeSelector">
+      <label for="hailSize">Size:</label>
+      <select id="hailSize">
+        <option value="">Select size</option>
+        <option>Pea (0.25″)</option>
+        <option>Nickel (0.88″)</option>
+        <option>Quarter (1.00″)</option>
+        <option>Half-Dollar (1.25″)</option>
+        <option>Ping Pong Ball (1.50″)</option>
+        <option>Golf Ball (1.75″)</option>
+        <option>Hen Egg (2.00″)</option>
+        <option>Pool Ball (2.25″)</option>
+        <option>Tennis Ball (2.50″)</option>
+        <option>Baseball (2.75″)</option>
+        <option>Apple (3.00″)</option>
+        <option>Softball (4.00″)</option>
+        <option>Grapefruit (4.50″)</option>
+        <option>DVD (5.00″)</option>
+        <option>Other (>5.00″) Describe in User Remark</option>
+      </select>
+    </div>
+
+    <div id="customHailInput">
+      <input type="text" id="customHailSize" placeholder="Describe hail size..." />
+    </div>
+
+    <div id="damageInput">
+      <input type="text" id="damageDescription" placeholder="Describe damage type..." />
+    </div>
+
+    <button id="captureBtn" title="Capture Screen"></button>
+    <button id="recordBtn" title="Record Video"></button>
+    <div id="recordTimer">00:00</div>
+    <button id="modeSwitchBtn">📹 Switch to Record</button>
+    <button id="howToReportBtn">How to Report</button>
+
+    <div id="notification">Please select a report type first!</div>
+
+    <div id="snapshot">
+      <img id="snapshotImg" alt="Captured"/>
+      <div class="button-container">
+        <button id="downloadSnap">Download</button>
+        <button id="closeSnap">Close</button>
+      </div>
+    </div>
+
+    <div id="videoPreview">
+      <video id="recordedVideo" controls></video>
+      <div class="button-container">
+        <button id="downloadVideo">Download</button>
+        <button id="closeVideo">Close</button>
+      </div>
+    </div>
+
+    <div id="tweetPanel">
+      <div id="tweetContent">
+        <h3>Share Report</h3>
+        <textarea id="tweetText" readonly></textarea>
+        <div id="charCounter">Characters: 0</div>
+        <button onclick="copyTweet()">Copy Tweet</button>
+      </div>
+    </div>
+  </div>
+
+
+
+<div id="locationMapPanel">
+  <div id="locationMapContainer">
+    <div id="locationMap"></div>
+    <div id="locationContent">
+      <h2 style="color: #4ecdc4; margin-bottom: 1.5rem;">Current Location Details</h2>
+      
+      <div style="background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 10px; margin-bottom: 1rem; width: 90%; max-width: 400px;">
+        <h3 style="color: #ff6b6b; margin-bottom: 0.8rem; font-size: 1.1rem;">📍 Coordinates</h3>
+        <p style="margin: 0.5rem 0;"><strong>Latitude:</strong> <span id="locLat" style="color: #4ecdc4;">--</span></p>
+        <p style="margin: 0.5rem 0;"><strong>Longitude:</strong> <span id="locLon" style="color: #4ecdc4;">--</span></p>
+      </div>
+      
+      <div style="background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 10px; margin-bottom: 1rem; width: 90%; max-width: 400px;">
+        <h3 style="color: #ff6b6b; margin-bottom: 0.8rem; font-size: 1.1rem;">🏙️ Location</h3>
+        <p style="margin: 0.5rem 0;"><strong>City:</strong> <span id="locCity" style="color: #4ecdc4;">--</span></p>
+        <p style="margin: 0.5rem 0;"><strong>State:</strong> <span id="locState" style="color: #4ecdc4;">--</span></p>
+        <p style="margin: 0.5rem 0;"><strong>County:</strong> <span id="locCounty" style="color: #4ecdc4;">--</span></p>
+      </div>
+      
+      <div style="background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 10px; margin-bottom: 1.5rem; width: 90%; max-width: 400px;">
+        <h3 style="color: #ff6b6b; margin-bottom: 0.8rem; font-size: 1.1rem;">🌤️ Weather Office</h3>
+        <p style="margin: 0.5rem 0;"><strong>WFO:</strong> <span id="locWFO" style="color: #4ecdc4;">--</span></p>
+        <p style="margin: 0.5rem 0;"><strong>X/Twitter:</strong> <span id="locWFOHandle" style="color: #4ecdc4; font-weight: bold;">--</span></p>
+        <p style="margin: 0.5rem 0;"><strong>Phone:</strong> <span id="locWFOPhone" style="color: #ffd93d;">--</span></p>
+        <p style="font-size: 0.8rem; color: #ff6b6b; margin-top: 0.5rem;">⚠️ Use phone with caution during severe weather</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="howToReportPanel">
+  <div id="howToReportContent">
+    <h2>How to Report</h2>
+    
+    <div class="important">
+      <strong>⚠️ SAFETY FIRST:</strong> Never put yourself in danger to get a photo or report. Your safety is more important than any report.
+    </div>
+
+    <h3>📝 How To Submit A Report</h3>
+    <ol>
+      <li><strong>Select report type</strong> from dropdown menu at top
+        <ul style="list-style-type: none; margin-top: 0.3rem; margin-left: -0.5rem;">
+          <li>• <strong>For hail:</strong> Select size or describe if larger than 5"</li>
+          <li>• <strong>For damage:</strong> Briefly describe what you see</li>
+        </ul>
+      </li>
+      <li><strong>Take photo</strong> using the capture button</li>
+      <li><strong>Download photo</strong> to attach to your tweet</li>
+      <li><strong>Swipe left</strong> to open tweet panel</li>
+      <li><strong>Copy tweet</strong> and post to X (Twitter)</li>
+    </ol>
+
+    <h3>📸 Taking Good Photos</h3>
+    <ul>
+      <li><strong>Landscape orientation</strong> - Hold your phone horizontally for wider view</li>
+      <li><strong>Include reference objects</strong> - Trees, buildings, or poles help show scale</li>
+      <li><strong>Clear view</strong> - Avoid shooting through windshield if possible (pull over safely)</li>
+    </ul>
+
+    <h3>📍 Location Accuracy</h3>
+    <ul>
+      <li>App automatically gets your GPS location</li>
+      <li>Swipe right to see detailed location info</li>
+      <li>Report where event is occurring, not where you are</li>
+      <li>If reporting something distant, estimate location in tweet</li>
+    </ul>
+
+    <h3>🌪️ What to Report</h3>
+    <ul>
+      <li><strong>Tornado</strong> - Visible funnel cloud touching the ground with rotation</li>
+      <li><strong>Funnel Cloud</strong> - Rotating funnel-shaped cloud NOT touching ground</li>
+      <li><strong>Wall Cloud</strong> - Lowered cloud base with rotation under storm base</li>
+      <li><strong>Hail</strong> - Report anything quarter-size (1") or larger</li>
+      <li><strong>Wind Damage</strong> - Trees down, structural damage, power lines down</li>
+      <li><strong>Flooding</strong> - Water over roadways, swift water rescues needed</li>
+    </ul>
+
+    <div class="tip">
+      <strong>💡 Hail Measurement Tips:</strong><br>
+      • Use a ruler or coin for size comparison in photo<br>
+      • Measure the largest stones you find<br>
+      • Report time hail started and stopped
+    </div>
+
+    <h3>🚫 What NOT to Report</h3>
+    <ul>
+      <li>Regular rain or non-severe thunderstorms</li>
+      <li>Lightning (unless damage occurs)</li>
+      <li>Small hail (less than 1" or quarter-size)</li>
+      <li>Gusty winds without damage</li>
+      <li>Dark clouds without rotation</li>
+    </ul>
+
+    <button id="howToReportClose" onclick="closeHowToReport()">Close</button>
+  </div>
+</div>
+
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+
+    const Version_ID ='V0.5';
+
+    let touchStartX = null;
+    let isPanelOpen = false;
+
+    function headingToCompass(deg){
+      if(deg==null||isNaN(deg))return'Unknown';
+      const dir=['N','NE','E','SE','S','SW','W','NW'];
+      return dir[Math.round(deg/45)%8];
+    }
+
+    function copyTweet(){
+      const t=document.getElementById('tweetText');
+      t.select();document.execCommand('copy');alert('Tweet copied!');
+    }
+
+    let tweetInfo={
+      event:'',size:'',customHailSize:'',damageDescription:'',city:'',state:'',county:'',lat:'',lon:'',wfo:'',timestamp:'',heading:null
+    };
+
+    let currentStream = null;
+    let currentZoom = 1;
+    const MIN_ZOOM = 1;
+    const MAX_ZOOM = 5;
+
+    async function startCamera(){
+
+      const VIDEO_CONSTRAINTS = {
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1920 },   // Force HD width
+          height: { ideal: 1080 },  // Force HD height
+          frameRate: { ideal: 30, max: 60 }
+        },
+        audio: false
+      };
+
+      const loader=document.getElementById('loader');
+      try{
+        const stream=await navigator.mediaDevices.getUserMedia(VIDEO_CONSTRAINTS);
+        currentStream = stream;
+        const v=document.getElementById('video');
+        v.srcObject=stream;await v.play();
+        
+        // Check if zoom is supported
+        const track = stream.getVideoTracks()[0];
+        const capabilities = track.getCapabilities();
+        if (capabilities.zoom) {
+          console.log('Camera zoom supported:', capabilities.zoom);
+        }
+      }catch(e){alert('Camera error: '+e.message);}
+      loader.style.display='none';
+    }
+
+    async function setZoom(zoomLevel) {
+      if (!currentStream) return;
+      
+      const track = currentStream.getVideoTracks()[0];
+      const capabilities = track.getCapabilities();
+      
+      if (capabilities.zoom) {
+        const constraints = {
+          advanced: [{ zoom: zoomLevel }]
+        };
+        
+        try {
+          await track.applyConstraints(constraints);
+          currentZoom = zoomLevel;
+          console.log('Zoom set to:', zoomLevel);
+        } catch (e) {
+          console.warn('Failed to set zoom:', e);
+        }
+      } else {
+        // Fallback: use CSS transform zoom on video element
+        const video = document.getElementById('video');
+        video.style.transform = `scale(${zoomLevel})`;
+        currentZoom = zoomLevel;
+        console.log('Using CSS zoom:', zoomLevel);
+      }
+    }
+
+    function zoomIn() {
+      const newZoom = Math.min(currentZoom + 0.5, MAX_ZOOM);
+      setZoom(newZoom);
+    }
+
+    function zoomOut() {
+      const newZoom = Math.max(currentZoom - 0.5, MIN_ZOOM);
+      setZoom(newZoom);
+    }
+
+    function showNotification(message) {
+      const notification = document.getElementById('notification');
+      notification.textContent = message;
+      notification.style.display = 'block';
+      
+      setTimeout(() => {
+        notification.style.display = 'none';
+      }, 3000);
+    }
+
+    async function capturePhoto(){
+      const captureButton = document.getElementById('captureBtn');
+      const eventSelector = document.getElementById('eventSelector');
+      const howToReportBtn = document.getElementById('howToReportBtn');
+      const eventType = document.getElementById('eventType');
+      const customHailInput = document.getElementById('customHailInput');
+      const damageInput = document.getElementById('damageInput');
+      const notification = document.getElementById('notification');
+      
+      // Check if report type is selected
+      if (!eventType.value) {
+        showNotification('Please select a report type first!');
+        return;
+      }
+      
+      // Check if hail size is selected when report type is Hail
+      if (eventType.value === 'Hail' && !document.getElementById('hailSize').value) {
+        showNotification('Please select hail size first!');
+        return;
+      }
+      
+      // Check if damage description is entered when report type is Damage
+      if (eventType.value === 'Damage' && !document.getElementById('damageDescription').value) {
+        showNotification('Please describe the damage first!');
+        return;
+      }
+      
+      // Make absolutely sure notification is hidden before capture
+      notification.style.display = 'none';
+      
+      // Hide elements before capture
+      captureButton.style.opacity = '0';
+      howToReportBtn.style.display = 'none';
+      document.getElementById('modeSwitchBtn').style.display = 'none';
+      document.getElementById('zoomIn').style.display = 'none';
+      document.getElementById('zoomOut').style.display = 'none';
+      
+      // Store original display states
+      const originalDisplay = eventSelector.style.display;
+      const originalHailDisplay = customHailInput.style.display;
+      const originalDamageDisplay = damageInput.style.display;
+      
+      // Hide "Select Report Type" option if it's selected
+      if (eventType.value === '') {
+        eventSelector.style.display = 'none';
+      } else {
+        // Also hide the selector even if a type is selected
+        eventSelector.style.display = 'none';
+      }
+      
+      // Hide custom input fields
+      customHailInput.style.display = 'none';
+      damageInput.style.display = 'none';
+      
+      const overlay=document.getElementById('snapshot'),img=document.getElementById('snapshotImg');
+      const canvas=await html2canvas(document.getElementById('app'),{useCORS:true, scale: window.devicePixelRatio || 3});
+      const dataUrl = canvas.toDataURL('image/png');
+      img.src=dataUrl;
+      
+      // Store the data URL for download functionality
+      img.dataset.dataUrl = dataUrl;
+      
+      overlay.style.display='flex';
+      
+      // Restore hidden elements
+      captureButton.style.opacity = '1';
+      eventSelector.style.display = originalDisplay;
+      howToReportBtn.style.display = 'block';
+      document.getElementById('modeSwitchBtn').style.display = 'block';
+      document.getElementById('zoomIn').style.display = 'flex';
+      document.getElementById('zoomOut').style.display = 'flex';
+      customHailInput.style.display = originalHailDisplay;
+      damageInput.style.display = originalDamageDisplay;
+    }
+
+    async function fetchCountyName(url){
+      try{
+        const r=await fetch(url);
+        if(!r.ok)throw'';
+        const z=await r.json();
+        return z.properties?.name||url.split('/').pop();
+      }catch{return url.split('/').pop();}
+    }
+
+    async function fetchNwsInfo(lat,lon,heading){
+      const info=document.getElementById('geoInfo');
+
+      try{
+        const r=await fetch(`https://api.weather.gov/points/${lat},${lon}`);
+        if(!r.ok)throw new Error(r.status);
+        const d=await r.json();
+        const city=d.properties.relativeLocation?.properties?.city||'Unknown';
+        const state=d.properties.relativeLocation?.properties?.state||'UNK';
+        const countyUrl=d.properties.county;
+        const county=countyUrl?await fetchCountyName(countyUrl):'Unknown';
+        const wfo=d.properties.cwa||'WFO';
+        const now = new Date();
+        const formattedTimestamp = `${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getDate().toString().padStart(2, '0')}/${now.getFullYear()} @ ${now.toLocaleTimeString('en-US', {hour: 'numeric', minute: '2-digit', hour12: true})}`;
+        tweetInfo={...tweetInfo,city,state,county,wfo:`${wfo}`,lat:lat.toFixed(3),lon:lon.toFixed(3),timestamp:formattedTimestamp,heading};
+        info.textContent=`${tweetInfo.timestamp} | Lat: ${tweetInfo.lat}, Lon: ${tweetInfo.lon} | Near: ${city}, ${state} | ${county} County | WFO: ${wfo}`;
+
+        document.getElementById('locLat').textContent = lat.toFixed(3);
+        document.getElementById('locLon').textContent = lon.toFixed(3);
+        document.getElementById('locCity').textContent = city;
+        document.getElementById('locCounty').textContent = county;
+
+      }catch(e){
+        info.textContent='NWS fetch error';
+      }
+    }
+
+    function initMap(){
+      const map=L.map('map');
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:9}).addTo(map);
+      if(navigator.geolocation){
+        navigator.geolocation.getCurrentPosition(async pos=>{
+          const {latitude:lat,longitude:lon,accuracy,heading}=pos.coords;
+          map.setView([lat,lon],9);
+          L.marker([lat,lon]).addTo(map);
+          if(accuracy)L.circle([lat,lon],{radius:accuracy,color:'#3388ff',weight:1}).addTo(map);
+          await fetchNwsInfo(lat,lon,heading);
+        },e=>alert('Geo error: '+e.message),{enableHighAccuracy:true,timeout:1e4});
+      }
+      map.zoomControl.remove();
+      map.scrollWheelZoom.disable();
+      map.doubleClickZoom.disable();
+      map.dragging.disable();
+    }
+
+    function setupMenus(){
+      const eventSel=document.getElementById('eventType'),
+            hailSel=document.getElementById('hailSizeSelector'),
+            hailSize=document.getElementById('hailSize'),
+            customHailInput=document.getElementById('customHailInput'),
+            customHailSize=document.getElementById('customHailSize'),
+            damageInput=document.getElementById('damageInput'),
+            damageDescription=document.getElementById('damageDescription');
+      function toggle(){
+        const e=eventSel.value;
+        tweetInfo.event=e;
+        hailSel.style.display=e==='Hail'?'block':'none';
+        damageInput.style.display=e==='Damage'?'block':'none';
+        if(e!=='Hail'){
+          tweetInfo.size='';
+          tweetInfo.customHailSize='';
+          hailSize.value='';
+          customHailSize.value='';
+          customHailInput.style.display='none';
+        }
+        if(e!=='Damage'){
+          tweetInfo.damageDescription='';
+          damageDescription.value='';
+        }
+      }
+      function toggleCustomInput(){
+        const isOther=hailSize.value==='Other (>5.00″) Describe in User Remark';
+        customHailInput.style.display=isOther?'block':'none';
+        if(!isOther){
+          tweetInfo.customHailSize='';
+          customHailSize.value='';
+        }
+        tweetInfo.size=hailSize.value;
+      }
+      eventSel.addEventListener('change',toggle);toggle();
+      hailSize.addEventListener('change',toggleCustomInput);
+      customHailSize.addEventListener('input',()=>tweetInfo.customHailSize=customHailSize.value);
+      customHailSize.addEventListener('blur',()=>tweetInfo.customHailSize=customHailSize.value);
+      damageDescription.addEventListener('input',()=>tweetInfo.damageDescription=damageDescription.value);
+      damageDescription.addEventListener('blur',()=>tweetInfo.damageDescription=damageDescription.value);
+    }
+
+    function getWFOHANDLE(WFO){
+      console.log('getting wfo X handle');
+      const wfo_handles= {
+
+        "ABQ": "NWSAlbuquerque",
+        "ABR": "NWSAberdeen",
+        "AFC": "NWSAnchorage",
+        "AMA": "NWSAmarillo",
+        "APX": "NWSGaylord",
+        "ARX": "NWSLaCrosse",
+        "BGM": "NWSBinghamton",
+        "BIS": "NWSBismarck",
+        "BOI": "NWSBoise",
+        "BOX": "NWSBoston",
+        "BTV": "NWSBurlington",
+        "BUF": "NWSBuffalo",
+        "BYZ": "NWSBillings",
+        "CAE": "NWSColumbia",
+        "CAR": "NWSCaribou",
+        "CHS": "NWSCharlestonSC",
+        "CLE": "NWSCleveland",
+        "CRP": "NWSCorpus",
+        "CTP": "NWSStateCollege",
+        "DDC": "NWSDodgeCity",
+        "DLH": "NWSDuluth",
+        "DMX": "NWSDesMoines",
+        "DTX": "NWSDetroit",
+        "DVN": "NWSDavenport",
+        "EAX": "NWSKansasCity",
+        "EPZ": "NWSElPaso",
+        "EWX": "NWSSanAntonio",
+        "FGF": "NWSGrandForks",
+        "FGZ": "NWSFlagstaff",
+        "FSD": "NWSFSiouxFalls",
+        "FWD": "NWSFortWorth",
+        "GID": "NWSHastings",
+        "GLD": "NWSGoodland",
+        "GRB": "NWSGreenBay",
+        "GRR": "NWSGrandRapids",
+        "GSP": "NWSGSP",
+        "GUM": "NWSGuam",
+        "HGX": "NWSHouston",
+        "HNX": "NWSHanford",
+        "HUN": "NWSHuntsville",
+        "ICT": "NWSWichita",
+        "ILM": "NWSWilmingtonNC",
+        "ILN": "NWSILN",
+        "IND": "NWSIndianapolis",
+        "JAN": "NWSJacksonMS",
+        "JAX": "NWSJacksonville",
+        "JKL": "NWSJacksonKY",
+        "LBF": "NWSNorthPlatte",
+        "LCH": "NWSLakeCharles",
+        "LIX": "NWSNewOrleans",
+        "LKN": "NWSElko",
+        "LMK": "NWSLouisville",
+        "LOT": "NWSChicago",
+        "LOX": "NWSLosAngeles",
+        "LUB": "NWSLubbock",
+        "LWX": "NWS_BaltWash",
+        "LZK": "NWSLittleRock",
+        "MAF": "NWSMidland",
+        "MEG": "NWSMemphis",
+        "MFL": "NWSMiami",
+        "MHX": "NWSMoreheadCity",
+        "MKX": "NWSMilwaukee",
+        "MLB": "NWSMelbourne",
+        "MOB": "NWSMobile",
+        "MPX": "NWSTwinCities",
+        "MQT": "NWSMarquette",
+        "MRX": "NWSMorristown",
+        "MSO": "NWSMissoula",
+        "MTR": "NWSSanFrancisco",
+        "OUN": "NWSNorman",
+        "PAH": "NWSPaducah",
+        "PBZ": "NWSPittsburgh",
+        "PDT": "NWSPendleton",
+        "PHI": "NWS_MountHolly",
+        "PIH": "NWSPocatello",
+        "PQR": "NWSPortland",
+        "PSR": "NWSPhoenix",
+        "PUB": "NWSPueblo",
+        "RAH": "NWSRaleigh",
+        "REV": "NWSReno",
+        "RIW": "NWSRiverton",
+        "RLX": "NWSCharlestonWV",
+        "RNK": "NWSBlacksburg",
+        "SGF": "NWSpringfield",
+        "SGX": "NWSSanDiego",
+        "SHV": "NWSShreveport",
+        "SJU": "NWSSanJuan",
+        "SLC": "NWSSaltLakeCity",
+        "STO": "NWSSacramento",
+        "TAE": "NWSTallahassee",
+        "TBW": "NWSTampaBay",
+        "TFX": "NWSGreatFalls",
+        "TOP": "NWSTopeka",
+        "TSA": "NWSTulsa",
+        "VEF": "NWSVegas",
+        "WFO": "NWS",        // Fallback
+        "AKQ": "NWSWakefieldVA",
+        "GYX": "NWSGray",
+        "OKX": "NWSNewYorkNY",
+        "SEW": "NWSSeattle",
+        "SJT": "NWSSanAngelo",
+        "OTX": "NWSSpokane",
+        "GJT": "NWSGrandJunction"
+      }
+
+
+      const handle = wfo_handles[WFO];
+
+      return handle;
+    }
+
+    function updateCharCounter(){
+      const tweetText=document.getElementById('tweetText').value;
+      const charCount=tweetText.length;
+      document.getElementById('charCounter').textContent=`Characters: ${charCount}`;
+    }
+
+    function openTweetPanel(){
+      const t=document.getElementById('tweetText');
+      let sizePart='';
+      if(tweetInfo.event==='Hail'&&tweetInfo.size){
+        if(tweetInfo.size==='Other (>5.00″) Describe in User Remark'&&tweetInfo.customHailSize){
+          sizePart=` (${tweetInfo.customHailSize})`;
+        }else{
+          sizePart=` (${tweetInfo.size})`;
+        }
+      }
+      let damagePart='';
+      if(tweetInfo.event==='Damage'&&tweetInfo.damageDescription){
+        damagePart=` (${tweetInfo.damageDescription})`;
+      }
+      const headingText=tweetInfo.heading!=null?` looking ${headingToCompass(tweetInfo.heading)}`:'';
+
+      handle = getWFOHANDLE(tweetInfo.wfo);
+      t.value=`${tweetInfo.event}${sizePart}${damagePart} reported near ${tweetInfo.city}, ${tweetInfo.state} (Lat ${tweetInfo.lat}, Lon ${tweetInfo.lon}) - ${tweetInfo.timestamp}. #${tweetInfo.state}wx @${handle} // Generated by Report Buddy.`;
+      updateCharCounter();
+      document.getElementById('tweetPanel').classList.add('open');
+      isPanelOpen = true;
+      console.log('opend tweet panel');
+    }
+
+    function closeTweetPanel() {
+      document.getElementById('tweetPanel').classList.remove('open');
+      isPanelOpen = false;
+      console.log('closed tweet panel');
+    }
+
+    function openLocationPanel() {
+
+    const wfo_phones = {
+      "ABQ": "505-325-3816",
+      "AMA": "806-354-2278",
+      "BMX": "205-664-3010",
+      "HUN": "256-890-8503",
+      "MOB": "251-633-6443",
+      "LZK": "501-834-0308",
+      "JAX": "904-741-4370",
+      "KEY": "305-295-1316",
+      "MLB": "321-255-2900",
+      "MFL": "305-229-4550",
+      "TAE": "850-942-8851",
+      "TBW": "813-645-2506",
+      "BMX": "205-664-3010",
+      "LCH": "337-439-0000",
+      "LIX": "504-522-7330",
+      "SHV": "318-635-7575",
+      "JAN": "601-936-2189",
+      "OUN": "405-325-3816",
+      "TSA": "918-743-3311",
+      "SJU": "787-253-0855",
+      "MRX": "423-586-3771",
+      "MEM": "901-544-0408",
+      "OHX": "615-754-4633",
+      "BRO": "956-504-1432",
+      "CRP": "361-289-0753",
+      "FWD": "817-429-2631",
+      "EPZ": "505-589-4088",
+      "HGX": "281-337-5074",
+      "LUB": "806-748-1071",
+      "MAF": "432-563-9292",
+      "SJT": "325-949-8586",
+      "FGZ": "928-774-3301",
+      "PSR": "602-275-0073",
+      "TWC": "520-881-3333",
+      "EKA": "707-443-7062",
+      "LOX": "805-988-6610",
+      "STO": "916-979-3051",
+      "SGX": "858-675-8706",
+      "BOI": "208-342-6569",
+      "PIH": "208-233-0137",
+      "BYZ": "406-652-1916",
+      "GGW": "406-228-9625",
+      "TFX": "406-453-5469",
+      "MSO": "406-721-3939",
+      "LKN": "775-738-3018",
+      "VEF": "702-263-9744",
+      "REV": "775-673-8130",
+      "MFR": "541-779-5990",
+      "PDT": "541-276-0103",
+      "PQR": "503-261-9246",
+      "SLC": "801-524-3057",
+      "SEW": "206-526-6087",
+      "OTX": "360-357-5291" /* approximate */
+    }
+
+    const wfo_phone_number=wfo_phones[tweetInfo.wfo];
+    const handle = getWFOHANDLE(tweetInfo.wfo);
+
+
+
+      document.getElementById('locationMapPanel').classList.add('open');
+      isPanelOpen = true;
+
+      // Fill location details
+      document.getElementById('locLat').textContent = tweetInfo.lat || '--';
+      document.getElementById('locLon').textContent = tweetInfo.lon || '--';
+      document.getElementById('locCity').textContent = tweetInfo.city || '--';
+      document.getElementById('locState').textContent = tweetInfo.state || '--';
+      document.getElementById('locCounty').textContent = tweetInfo.county || '--';
+      //console.log(tweetInfo.wfo);
+      document.getElementById('locWFO').textContent = tweetInfo.wfo || '--';
+      document.getElementById('locWFOHandle').textContent = `@${handle}` || '--';
+      document.getElementById('locWFOPhone').textContent = wfo_phone_number || '--';
+
+
+      // Init or update map view
+      initLocationMap(parseFloat(tweetInfo.lat), parseFloat(tweetInfo.lon));
+    }
+
+
+    function closeLocationPanel() {
+      document.getElementById('locationMapPanel').classList.remove('open');
+      isPanelOpen = false;
+    }
+
+    let isHowToReportOpen = false;
+
+    function openHowToReport() {
+      document.getElementById('howToReportPanel').classList.add('open');
+      isHowToReportOpen = true;
+    }
+
+    function closeHowToReport() {
+      document.getElementById('howToReportPanel').classList.remove('open');
+      isHowToReportOpen = false;
+    }
+
+    // Swipe detection
+    document.addEventListener('touchstart', e => {
+      touchStartX = e.changedTouches[0].clientX;
+    });
+
+    document.addEventListener('touchend', e => {
+      if (touchStartX === null) return;
+      
+      // Disable swipe gestures when How to Report panel is open
+      if (isHowToReportOpen) {
+        touchStartX = null;
+        return;
+      }
+      
+      const dx = e.changedTouches[0].clientX - touchStartX;
+
+      if (dx < -100 && !isPanelOpen) {
+        openTweetPanel();
+      } else if (dx > 100 && !isPanelOpen) {
+        openLocationPanel();
+      } else if (dx > 100 && document.getElementById('tweetPanel').classList.contains('open')) {
+        // Right swipe while tweet panel is open should close it
+        closeTweetPanel();
+      } else if (dx < -100 && document.getElementById('locationMapPanel').classList.contains('open')) {
+        // Left swipe while location panel is open should close it
+        closeLocationPanel();
+      }
+
+      touchStartX = null;
+    });
+
+
+
+    let locationMap;
+    let countyLayer=null;
+
+    let locationMarker = null;
+    
+    function initLocationMap(lat = 38.0, lon = -97.0) {
+      if (locationMap) {
+        locationMap.setView([lat, lon], 9);
+        if (locationMarker) {
+          locationMarker.setLatLng([lat, lon]);
+        } else {
+          locationMarker = L.marker([lat, lon]).addTo(locationMap);
+        }
+        return;
+      }
+
+      locationMap = L.map('locationMap');
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 14,
+        minZoom: 4
+      }).addTo(locationMap);
+      locationMap.setView([lat, lon], 8);
+      locationMarker = L.marker([lat, lon]).addTo(locationMap);
+
+      fetch("https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json")
+        .then(response => {
+          if (!response.ok) throw new Error("Failed to load county GeoJSON");
+          return response.json();
+        })
+        .then(countyData => {
+          countyLayer = L.geoJSON(countyData, {
+            style: {
+              color: "#300000",
+              weight: 0.7,
+              fillOpacity: 0,
+              dashArray: '12,12'
+            }
+          }).addTo(locationMap); // make sure `map` is globally accessible
+        })
+        .catch(error => {
+          console.error("Error loading county data:", error);
+        });
+
+    fetch("https://mapservices.weather.noaa.gov/static/rest/services/nws_reference_maps/nws_reference_map/FeatureServer/1/query?where=1=1&outFields=*&f=geojson")
+      .then(res => {
+        if (!res.ok) throw new Error("Failed to load CWA GeoJSON");
+        return res.json();
+      })
+      .then(cwaData => {
+        const cwaLayer = L.geoJSON(cwaData, {
+          style: feature => ({
+            color: "#800080",       // purple outline
+            weight: 5,
+            fill: false,
+          })
+        }).addTo(locationMap);
+      })
+      .catch(err => console.error("Error loading CWA boundaries:", err));
+
+
+
+    }
+
+
+    function downloadImage() {
+      const img = document.getElementById('snapshotImg');
+      const dataUrl = img.dataset.dataUrl;
+      if (dataUrl) {
+        const link = document.createElement('a');
+        const now = new Date();
+        const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(now.getUTCDate()).padStart(2, '0');
+        const year = now.getUTCFullYear();
+        const hours = String(now.getUTCHours()).padStart(2, '0');
+        const minutes = String(now.getUTCMinutes()).padStart(2, '0');
+        link.download = `report-buddy-${month}_${day}_${year}_${hours}${minutes}z.png`;
+        link.href = dataUrl;
+        link.click();
+      }
+    }
+
+    // Video Recording Variables
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let recordingTimer = null;
+    let recordingStartTime = null;
+    let isRecordMode = false;
+    const MAX_RECORDING_TIME = 30000; // 30 seconds in milliseconds
+
+    function switchMode() {
+      const modeSwitchBtn = document.getElementById('modeSwitchBtn');
+      const captureBtn = document.getElementById('captureBtn');
+      const recordBtn = document.getElementById('recordBtn');
+      
+      isRecordMode = !isRecordMode;
+      
+      if (isRecordMode) {
+        modeSwitchBtn.textContent = '📷 Switch to Photo';
+        modeSwitchBtn.classList.add('record-mode');
+        captureBtn.style.display = 'none';
+        recordBtn.style.display = 'block';
+      } else {
+        modeSwitchBtn.textContent = '📹 Switch to Record';
+        modeSwitchBtn.classList.remove('record-mode');
+        captureBtn.style.display = 'block';
+        recordBtn.style.display = 'none';
+        // Stop recording if switching modes
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+          stopRecording();
+        }
+      }
+    }
+
+    function updateRecordingTimer() {
+      if (!recordingStartTime) return;
+      
+      const elapsed = Date.now() - recordingStartTime;
+      const seconds = Math.floor(elapsed / 1000);
+      const minutes = Math.floor(seconds / 60);
+      const displaySeconds = seconds % 60;
+      
+      document.getElementById('recordTimer').textContent = 
+        `${minutes.toString().padStart(2, '0')}:${displaySeconds.toString().padStart(2, '0')}`;
+      
+      // Auto-stop at 30 seconds
+      if (elapsed >= MAX_RECORDING_TIME) {
+        stopRecording();
+      }
+    }
+
+    async function startRecording() {
+      const eventType = document.getElementById('eventType');
+      const notification = document.getElementById('notification');
+      const eventSelector = document.getElementById('eventSelector');
+      const customHailInput = document.getElementById('customHailInput');
+      const damageInput = document.getElementById('damageInput');
+      const howToReportBtn = document.getElementById('howToReportBtn');
+      const modeSwitchBtn = document.getElementById('modeSwitchBtn');
+      
+      // Check if report type is selected
+      if (!eventType.value) {
+        showNotification('Please select a report type first!');
+        return;
+      }
+      
+      // Check if hail size is selected when report type is Hail
+      if (eventType.value === 'Hail' && !document.getElementById('hailSize').value) {
+        showNotification('Please select hail size first!');
+        return;
+      }
+      
+      // Check if damage description is entered when report type is Damage
+      if (eventType.value === 'Damage' && !document.getElementById('damageDescription').value) {
+        showNotification('Please describe the damage first!');
+        return;
+      }
+      
+      // Hide notification and UI elements before recording
+      notification.style.display = 'none';
+      
+      // Store original display states
+      const originalEventDisplay = eventSelector.style.display;
+      const originalHailDisplay = customHailInput.style.display;
+      const originalDamageDisplay = damageInput.style.display;
+      
+      // Hide UI elements for clean recording
+      if (eventType.value === '') {
+        eventSelector.style.display = 'none';
+      } else {
+        eventSelector.style.display = 'none';
+      }
+      customHailInput.style.display = 'none';
+      damageInput.style.display = 'none';
+      howToReportBtn.style.display = 'none';
+      modeSwitchBtn.style.display = 'none';
+      document.getElementById('recordBtn').style.opacity = '0.3';
+      
+      try {
+        // Try to get display media (screen recording) first
+        let stream;
+        try {
+          // Request display media (will capture the full screen including map and details)
+          stream = await navigator.mediaDevices.getDisplayMedia({
+            video: {
+              width: { ideal: 1920 },
+              height: { ideal: 1080 },
+              frameRate: { ideal: 30 }
+            },
+            audio: false
+          });
+        } catch (displayError) {
+          // Fallback to camera if display media is not available
+          stream = await navigator.mediaDevices.getUserMedia({ 
+            video: {
+              facingMode: { ideal: 'environment' },
+              width: { ideal: 1920 },
+              height: { ideal: 1080 }
+            },
+            audio: true 
+          });
+        }
+        
+        recordedChunks = [];
+        mediaRecorder = new MediaRecorder(stream, {
+          mimeType: 'video/webm;codecs=vp9,opus'
+        });
+        
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            recordedChunks.push(event.data);
+          }
+        };
+        
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(recordedChunks, { type: 'video/webm' });
+          const url = URL.createObjectURL(blob);
+          
+          // Show video preview
+          const videoPreview = document.getElementById('videoPreview');
+          const recordedVideo = document.getElementById('recordedVideo');
+          recordedVideo.src = url;
+          videoPreview.style.display = 'flex';
+          
+          // Store blob for download
+          recordedVideo.dataset.blob = url;
+          
+          // Stop all tracks
+          stream.getTracks().forEach(track => track.stop());
+          
+          // Restore UI elements
+          eventSelector.style.display = originalEventDisplay;
+          customHailInput.style.display = originalHailDisplay;
+          damageInput.style.display = originalDamageDisplay;
+          howToReportBtn.style.display = 'block';
+          modeSwitchBtn.style.display = 'block';
+          document.getElementById('recordBtn').style.opacity = '1';
+        };
+        
+        mediaRecorder.start();
+        recordingStartTime = Date.now();
+        
+        // Update UI
+        document.getElementById('recordBtn').classList.add('recording');
+        document.getElementById('recordTimer').style.display = 'block';
+        
+        // Start timer
+        recordingTimer = setInterval(updateRecordingTimer, 100);
+        
+      } catch (error) {
+        // Restore UI elements on error
+        eventSelector.style.display = originalEventDisplay;
+        customHailInput.style.display = originalHailDisplay;
+        damageInput.style.display = originalDamageDisplay;
+        howToReportBtn.style.display = 'block';
+        modeSwitchBtn.style.display = 'block';
+        document.getElementById('recordBtn').style.opacity = '1';
+        
+        alert('Failed to start recording: ' + error.message);
+      }
+    }
+
+    function stopRecording() {
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+        
+        // Clear timer
+        if (recordingTimer) {
+          clearInterval(recordingTimer);
+          recordingTimer = null;
+        }
+        
+        // Reset UI
+        document.getElementById('recordBtn').classList.remove('recording');
+        document.getElementById('recordTimer').style.display = 'none';
+        document.getElementById('recordTimer').textContent = '00:00';
+        recordingStartTime = null;
+      }
+    }
+
+    function toggleRecording() {
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        stopRecording();
+      } else {
+        startRecording();
+      }
+    }
+
+    function downloadVideo() {
+      const recordedVideo = document.getElementById('recordedVideo');
+      const url = recordedVideo.dataset.blob;
+      
+      if (url) {
+        const link = document.createElement('a');
+        const now = new Date();
+        const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(now.getUTCDate()).padStart(2, '0');
+        const year = now.getUTCFullYear();
+        const hours = String(now.getUTCHours()).padStart(2, '0');
+        const minutes = String(now.getUTCMinutes()).padStart(2, '0');
+        link.download = `report-buddy-video-${month}_${day}_${year}_${hours}${minutes}z.webm`;
+        link.href = url;
+        link.click();
+      }
+    }
+
+    window.addEventListener('load',()=>{
+      startCamera();
+      initMap();
+      setupMenus();
+      document.getElementById('captureBtn').addEventListener('click',capturePhoto);
+      document.getElementById('closeSnap').addEventListener('click',()=>document.getElementById('snapshot').style.display='none');
+      document.getElementById('downloadSnap').addEventListener('click',downloadImage);
+      document.getElementById('zoomIn').addEventListener('click',zoomIn);
+      document.getElementById('zoomOut').addEventListener('click',zoomOut);
+      document.getElementById('howToReportBtn').addEventListener('click',openHowToReport);
+      
+      // Video recording event listeners
+      document.getElementById('modeSwitchBtn').addEventListener('click', switchMode);
+      document.getElementById('recordBtn').addEventListener('click', toggleRecording);
+      document.getElementById('closeVideo').addEventListener('click', () => {
+        document.getElementById('videoPreview').style.display = 'none';
+        // Clean up the blob URL
+        const recordedVideo = document.getElementById('recordedVideo');
+        if (recordedVideo.dataset.blob) {
+          URL.revokeObjectURL(recordedVideo.dataset.blob);
+          recordedVideo.dataset.blob = '';
+        }
+      });
+      document.getElementById('downloadVideo').addEventListener('click', downloadVideo);
+    });
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then((registration) => {
+            console.log('ServiceWorker registration successful with scope: ', registration.scope);
+          })
+          .catch((err) => {
+            console.log('ServiceWorker registration failed: ', err);
+          });
+      });
+    }
+  </script>
+</body>
+</html>
