@@ -78,6 +78,7 @@
       transition: background-color 0.5s ease;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 8px rgba(0, 0, 0, 0.3);
     }
+
     /* ── Compass Overlay ── */
     #compass-overlay {
       position: fixed;
@@ -617,7 +618,6 @@
               lineDiv.classList.add('major');
             } else if (deg % 5 === 0) {
               labelDiv.innerHTML = '&nbsp;';
-              // normal tick
             } else {
               labelDiv.innerHTML = '&nbsp;';
               lineDiv.classList.add('minor');
@@ -632,47 +632,61 @@
       buildTape();
 
       let currentHeading = null;
+      let hasAbsoluteListener = false;
+
+      // Get the screen orientation angle to compensate for landscape mode
+      // landscape-left (phone rotated CCW) = 90, landscape-right = -90 or 270
+      function getScreenOrientationAngle() {
+        if (screen.orientation && screen.orientation.angle !== undefined) {
+          return screen.orientation.angle;
+        }
+        // Fallback for older browsers / iOS
+        if (window.orientation !== undefined) {
+          return window.orientation;
+        }
+        return 0;
+      }
 
       function updateCompassPosition(heading) {
         currentHeading = heading;
         const wrapperWidth = wrapper.offsetWidth;
         const halfWrapper = wrapperWidth / 2;
-        // Center of the middle copy (copy index 1)
         const middleStart = TOTAL_DEGREES * TICK_WIDTH;
         const offset = middleStart + (heading * TICK_WIDTH) - halfWrapper;
         tape.style.transform = `translateX(${-offset}px)`;
 
-        // Direction label
         const dirs = ['N','NE','E','SE','S','SW','W','NW'];
         const dirLabel = dirs[Math.round(heading / 45) % 8];
         readout.textContent = `${Math.round(heading)}\u00B0 ${dirLabel}`;
       }
 
-      let hasAbsoluteListener = false; // track if we got the preferred absolute event
-
       function handleOrientation(event) {
-        // If we already have the absolute listener providing data, ignore the
-        // regular deviceorientation to avoid conflicts
         if (hasAbsoluteListener && !event._fromAbsolute) return;
 
         let heading = null;
 
-        // iOS provides webkitCompassHeading (degrees from magnetic north)
+        // iOS provides webkitCompassHeading (already accounts for orientation)
         if (event.webkitCompassHeading !== undefined && event.webkitCompassHeading !== null) {
           heading = event.webkitCompassHeading;
         }
-        // Android/Chrome absolute event or absolute:true — alpha is from north
+        // Android/Chrome — alpha from north (reversed)
         else if (event.alpha !== null) {
           heading = (360 - event.alpha) % 360;
         }
 
         if (heading !== null && !isNaN(heading)) {
+          // Compensate for screen orientation (landscape mode)
+          // When phone is in landscape-left (90°), the sensor's reference
+          // frame is rotated, so we subtract the screen angle
+          const orientationAngle = getScreenOrientationAngle();
+          heading = (heading + orientationAngle) % 360;
+          if (heading < 0) heading += 360;
+
           noSensor.style.display = 'none';
           updateCompassPosition(heading);
         }
       }
 
-      // Handler specifically for the absolute orientation event (Android Chrome)
       function handleAbsoluteOrientation(event) {
         if (event.alpha !== null) {
           hasAbsoluteListener = true;
@@ -711,21 +725,17 @@
           noSensor.textContent = 'Tap to enable compass';
           noSensor.addEventListener('click', requestCompassPermission);
         } else {
-          // Android / desktop —
-          // Prefer 'deviceorientationabsolute' (Chrome Android) for true north heading.
-          // Fall back to regular 'deviceorientation' if absolute isn't available.
+          // Android / desktop
+          // Prefer deviceorientationabsolute (Chrome Android) for true north
           if ('ondeviceorientationabsolute' in window) {
             window.addEventListener('deviceorientationabsolute', handleAbsoluteOrientation, true);
           }
-          // Also listen to regular event as a fallback
           window.addEventListener('deviceorientation', handleOrientation, true);
 
-          // Show a fallback message after a delay if no data arrives
           setTimeout(() => {
             if (currentHeading === null) {
               noSensor.style.display = 'block';
               noSensor.textContent = 'No compass sensor detected';
-              // Set a default north view so the tape is visible
               updateCompassPosition(0);
             }
           }, 3000);
