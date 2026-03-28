@@ -1,0 +1,26 @@
+{
+  "name": "Report Buddy",
+  "short_name": "ReportBuddy",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/google/material-design-icons/master/png/action/camera_enhance/materialicons/48dp/2x/baseline_camera_enhance_white_48dp.png",
+      "sizes": "96x96",
+      "type": "image/png"
+    },
+    {
+      "src": "https://raw.githubusercontent.com/google/material-design-icons/master/png/action/camera_enhance/materialicons/48dp/2x/baseline_camera_enhance_white_48dp.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://raw.githubusercontent.com/google/material-design-icons/master/png/action/camera_enhance/materialicons/48dp/2x/baseline_camera_enhance_white_48dp.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
