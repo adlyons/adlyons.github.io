@@ -22,199 +22,46 @@
       height: 360px;
       display: flex;
       flex-direction: column;
-      border: 2px solid rgba(255, 255, 255, 0.2);
-      border-radius: 10px;
-      background-color: rgba(0, 0, 0, 0.6);
+      border: 5px solid black;
+      background-color: rgba(255,255,255,0.8);
       transition: background-color 0.5s ease;
       z-index: 1000;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 8px rgba(0, 0, 0, 0.3);
-      overflow: hidden;
     }
-    #map {
-      flex: 1;
-      border-bottom: 2px solid rgba(255, 255, 255, 0.15);
-      border-radius: 8px 8px 0 0;
-    }
+    #map { flex: 1; border-bottom: 4px solid black; }
     #info {
-      padding: 10px 12px;
+      padding: 8px;
       font-family: Arial, sans-serif;
       font-size: 16px;
-      font-weight: 600;
       text-align: center;
-      color: #fff;
-      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
     }
     #clock {
       position: fixed;
       bottom: 390px;
       left: 10px;
-      padding: 8px 14px;
-      border: 2px solid rgba(255, 255, 255, 0.2);
-      border-radius: 8px;
-      background-color: rgba(0, 0, 0, 0.6);
-      font-family: 'Consolas', 'Courier New', monospace;
+      padding: 8px 12px;
+      border: 4px solid black;
+      background-color: rgba(255,255,255,0.8);
+      font-family: Arial, sans-serif;
       font-size: 24px;
-      color: #fff;
-      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
       z-index: 1001;
       transition: background-color 0.5s ease;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 8px rgba(0, 0, 0, 0.3);
     }
     #stormBanner {
       position: fixed;
       bottom: 10px;
-      left: 50%;
+      left: 60%;
       transform: translateX(-50%);
-      padding: 10px 24px;
-      border: 2px solid rgba(255, 255, 255, 0.2);
-      border-radius: 8px;
-      background-color: rgba(0, 0, 0, 0.6);
+      padding: 8px 20px;
+      border: 4px solid black;
+      background-color: rgba(255,255,255,0.8);
       font-family: Arial, sans-serif;
       font-size: 22px;
-      font-weight: 600;
-      color: #fff;
-      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
       z-index: 1002;
       transition: background-color 0.5s ease;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 8px rgba(0, 0, 0, 0.3);
-    }
-    /* ── Compass Overlay ── */
-    #compass-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 1920px;
-      height: 70px;
-      z-index: 2000;
-      pointer-events: none;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    #compass-tape-wrapper {
-      width: 900px;
-      height: 50px;
-      overflow: hidden;
-      position: relative;
-      background: rgba(0, 0, 0, 0.55);
-      border-bottom: 3px solid rgba(255, 255, 255, 0.3);
-      border-left: 3px solid rgba(255, 255, 255, 0.15);
-      border-right: 3px solid rgba(255, 255, 255, 0.15);
-      border-radius: 0 0 10px 10px;
-    }
-    #compass-tape {
-      position: absolute;
-      top: 0;
-      height: 100%;
-      white-space: nowrap;
-      display: flex;
-      align-items: flex-end;
-      transition: transform 0.08s linear;
-    }
-    .compass-tick {
-      display: inline-flex;
-      flex-direction: column;
-      align-items: center;
-      width: 15px;
-      flex-shrink: 0;
-    }
-    .compass-tick .label {
-      font-family: 'Consolas', 'Courier New', monospace;
-      font-weight: bold;
-      color: #fff;
-      font-size: 16px;
-      margin-bottom: 2px;
-      text-shadow: 0 0 4px rgba(0,0,0,0.8);
-    }
-    .compass-tick .label.cardinal {
-      color: #ff4444;
-      font-size: 20px;
-    }
-    .compass-tick .label.intercardinal {
-      color: #ffaa00;
-      font-size: 17px;
-    }
-    .compass-tick .tick-line {
-      width: 2px;
-      background: rgba(255,255,255,0.5);
-      height: 10px;
-    }
-    .compass-tick .tick-line.major {
-      height: 18px;
-      width: 3px;
-      background: rgba(255,255,255,0.9);
-    }
-    .compass-tick .tick-line.minor {
-      height: 6px;
-      background: rgba(255,255,255,0.25);
-    }
-    #compass-center-indicator {
-      position: absolute;
-      top: 0;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 3px;
-      height: 100%;
-      background: #ff4444;
-      z-index: 10;
-    }
-    #compass-center-indicator::after {
-      content: '';
-      position: absolute;
-      bottom: -6px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 0; height: 0;
-      border-left: 7px solid transparent;
-      border-right: 7px solid transparent;
-      border-bottom: 7px solid #ff4444;
-    }
-    #compass-center-indicator::before {
-      content: '';
-      position: absolute;
-      top: -6px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 0; height: 0;
-      border-left: 7px solid transparent;
-      border-right: 7px solid transparent;
-      border-top: 7px solid #ff4444;
-    }
-    #compass-heading-readout {
-      font-family: 'Consolas', 'Courier New', monospace;
-      font-size: 20px;
-      font-weight: bold;
-      color: #fff;
-      background: rgba(0, 0, 0, 0.65);
-      padding: 2px 14px;
-      border-radius: 0 0 8px 8px;
-      text-shadow: 0 0 6px rgba(0,0,0,0.9);
-      letter-spacing: 1px;
-    }
-    #compass-no-sensor {
-      display: none;
-      font-family: 'Consolas', 'Courier New', monospace;
-      font-size: 14px;
-      color: #ff6666;
-      background: rgba(0, 0, 0, 0.65);
-      padding: 2px 14px;
-      border-radius: 0 0 8px 8px;
-      pointer-events: auto;
-      cursor: pointer;
     }
   </style>
 </head>
 <body>
-  <!-- Compass Overlay -->
-  <div id="compass-overlay">
-    <div id="compass-tape-wrapper">
-      <div id="compass-center-indicator"></div>
-      <div id="compass-tape"></div>
-    </div>
-    <div id="compass-heading-readout">---</div>
-    <div id="compass-no-sensor">Tap to enable compass</div>
-  </div>
-
   <div id="clock">Loading clock...</div>
   <div id="container">
     <div id="map"></div>
@@ -359,7 +206,7 @@
       const alertsResp = await fetch(`https://api.weather.gov/alerts/active?point=${lat},${lon}`);
       const alertsData = await alertsResp.json();
 
-      let bgColor = "rgba(0, 0, 0, 0.6)";
+      let bgColor = "rgba(255,255,255,0.8)";
       let alertText = "No active severe alerts.";
 
       if (alertsData.features?.length > 0) {
@@ -367,11 +214,11 @@
         if (selected) {
           const event = selected.properties.event;
           let color = bgColor;
-          if (/Tornado Warning/i.test(event)) color = "rgba(255, 0, 255, 0.45)";
-          else if (/Severe Thunderstorm Warning/i.test(event)) color = "rgba(255, 165, 0, 0.45)";
-          else if (/Tornado Watch/i.test(event)) color = "rgba(255, 255, 0, 0.35)";
-          else if (/Severe Thunderstorm Watch/i.test(event)) color = "rgba(255, 182, 193, 0.35)";
-          else if (/Flash Flood Warning/i.test(event)) color = "rgba(0, 180, 0, 0.4)";
+          if (/Tornado Warning/i.test(event)) color = "magenta";
+          else if (/Severe Thunderstorm Warning/i.test(event)) color = "orange";
+          else if (/Tornado Watch/i.test(event)) color = "yellow";
+          else if (/Severe Thunderstorm Watch/i.test(event)) color = "pink";
+          else if (/Flash Flood Warning/i.test(event)) color = "green";
 
           const tagStr = buildTags(selected);
           alertText = `${event}<br>${tagStr}`;
@@ -490,10 +337,10 @@
             const distMi = (minDist * 0.621371).toFixed(1);
             const LSR_loc = closest.properties.location ?? "Unknown";
             const LSR_state = closest.properties.state ?? "Unknown";
-            let color = "rgba(80, 80, 80, 0.6)";
-            if (type === "tornado") color = "rgba(220, 40, 40, 0.5)";
-            else if (type === "wind") color = "rgba(40, 100, 220, 0.5)";
-            else if (type === "hail") color = "rgba(40, 180, 80, 0.5)";
+            let color = "gray";
+            if (type === "tornado") color = "red";
+            else if (type === "wind") color = "blue";
+            else if (type === "hail") color = "green";
 
             banner.style.backgroundColor = color;
             banner.innerHTML = `
@@ -502,14 +349,14 @@
             `;
           }
         } else {
-          banner.style.backgroundColor = "rgba(80, 80, 80, 0.6)";
+          banner.style.backgroundColor = "gray";
           banner.innerHTML = "No reports nearby.";
         }
 
       } catch (e) {
         console.error("Failed to load storm reports", e);
         const banner = document.getElementById("stormBanner");
-        banner.style.backgroundColor = "rgba(80, 80, 80, 0.6)";
+        banner.style.backgroundColor = "gray";
         banner.textContent = "No reports nearby.";
       }
     }
@@ -582,160 +429,6 @@
     }
 
     setup();
-
-    // ------------------ Compass Heading Overlay ------------------
-    (function() {
-      const TICK_WIDTH = 15; // px per degree
-      const TOTAL_DEGREES = 360;
-      const TAPE_COPIES = 3; // render 3x360 so we can seamlessly wrap
-
-      const cardinals = { 0:'N', 45:'NE', 90:'E', 135:'SE', 180:'S', 225:'SW', 270:'W', 315:'NW' };
-      const tape = document.getElementById('compass-tape');
-      const wrapper = document.getElementById('compass-tape-wrapper');
-      const readout = document.getElementById('compass-heading-readout');
-      const noSensor = document.getElementById('compass-no-sensor');
-
-      // Build the tape: 3 copies of 0-359 for seamless wrapping
-      function buildTape() {
-        tape.innerHTML = '';
-        for (let copy = 0; copy < TAPE_COPIES; copy++) {
-          for (let deg = 0; deg < TOTAL_DEGREES; deg++) {
-            const tick = document.createElement('div');
-            tick.className = 'compass-tick';
-
-            const labelDiv = document.createElement('div');
-            labelDiv.className = 'label';
-            const lineDiv = document.createElement('div');
-            lineDiv.className = 'tick-line';
-
-            if (cardinals[deg] !== undefined) {
-              labelDiv.textContent = cardinals[deg];
-              labelDiv.classList.add(deg % 90 === 0 ? 'cardinal' : 'intercardinal');
-              lineDiv.classList.add('major');
-            } else if (deg % 10 === 0) {
-              labelDiv.textContent = deg + '\u00B0';
-              lineDiv.classList.add('major');
-            } else if (deg % 5 === 0) {
-              labelDiv.innerHTML = '&nbsp;';
-              // normal tick
-            } else {
-              labelDiv.innerHTML = '&nbsp;';
-              lineDiv.classList.add('minor');
-            }
-
-            tick.appendChild(labelDiv);
-            tick.appendChild(lineDiv);
-            tape.appendChild(tick);
-          }
-        }
-      }
-      buildTape();
-
-      let currentHeading = null;
-
-      function updateCompassPosition(heading) {
-        currentHeading = heading;
-        const wrapperWidth = wrapper.offsetWidth;
-        const halfWrapper = wrapperWidth / 2;
-        // Center of the middle copy (copy index 1)
-        const middleStart = TOTAL_DEGREES * TICK_WIDTH;
-        const offset = middleStart + (heading * TICK_WIDTH) - halfWrapper;
-        tape.style.transform = `translateX(${-offset}px)`;
-
-        // Direction label
-        const dirs = ['N','NE','E','SE','S','SW','W','NW'];
-        const dirLabel = dirs[Math.round(heading / 45) % 8];
-        readout.textContent = `${Math.round(heading)}\u00B0 ${dirLabel}`;
-      }
-
-      let hasAbsoluteListener = false; // track if we got the preferred absolute event
-
-      function handleOrientation(event) {
-        // If we already have the absolute listener providing data, ignore the
-        // regular deviceorientation to avoid conflicts
-        if (hasAbsoluteListener && !event._fromAbsolute) return;
-
-        let heading = null;
-
-        // iOS provides webkitCompassHeading (degrees from magnetic north)
-        if (event.webkitCompassHeading !== undefined && event.webkitCompassHeading !== null) {
-          heading = event.webkitCompassHeading;
-        }
-        // Android/Chrome absolute event or absolute:true — alpha is from north
-        else if (event.alpha !== null) {
-          heading = (360 - event.alpha) % 360;
-        }
-
-        if (heading !== null && !isNaN(heading)) {
-          noSensor.style.display = 'none';
-          updateCompassPosition(heading);
-        }
-      }
-
-      // Handler specifically for the absolute orientation event (Android Chrome)
-      function handleAbsoluteOrientation(event) {
-        if (event.alpha !== null) {
-          hasAbsoluteListener = true;
-          event._fromAbsolute = true;
-          handleOrientation(event);
-        }
-      }
-
-      // iOS 13+ requires permission request
-      function requestCompassPermission() {
-        if (typeof DeviceOrientationEvent !== 'undefined' &&
-            typeof DeviceOrientationEvent.requestPermission === 'function') {
-          DeviceOrientationEvent.requestPermission()
-            .then(response => {
-              if (response === 'granted') {
-                window.addEventListener('deviceorientation', handleOrientation, true);
-                noSensor.style.display = 'none';
-              } else {
-                noSensor.textContent = 'Compass permission denied';
-                noSensor.style.display = 'block';
-              }
-            })
-            .catch(err => {
-              console.warn('Compass permission error:', err);
-              noSensor.textContent = 'Compass unavailable';
-              noSensor.style.display = 'block';
-            });
-        }
-      }
-
-      // Try to start listening
-      if (typeof DeviceOrientationEvent !== 'undefined') {
-        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-          // iOS 13+ — needs user gesture
-          noSensor.style.display = 'block';
-          noSensor.textContent = 'Tap to enable compass';
-          noSensor.addEventListener('click', requestCompassPermission);
-        } else {
-          // Android / desktop —
-          // Prefer 'deviceorientationabsolute' (Chrome Android) for true north heading.
-          // Fall back to regular 'deviceorientation' if absolute isn't available.
-          if ('ondeviceorientationabsolute' in window) {
-            window.addEventListener('deviceorientationabsolute', handleAbsoluteOrientation, true);
-          }
-          // Also listen to regular event as a fallback
-          window.addEventListener('deviceorientation', handleOrientation, true);
-
-          // Show a fallback message after a delay if no data arrives
-          setTimeout(() => {
-            if (currentHeading === null) {
-              noSensor.style.display = 'block';
-              noSensor.textContent = 'No compass sensor detected';
-              // Set a default north view so the tape is visible
-              updateCompassPosition(0);
-            }
-          }, 3000);
-        }
-      } else {
-        noSensor.style.display = 'block';
-        noSensor.textContent = 'Compass not supported';
-        updateCompassPosition(0);
-      }
-    })();
   </script>
 </body>
 </html>
