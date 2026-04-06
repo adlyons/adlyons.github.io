@@ -203,52 +203,9 @@
       pointer-events: none;
     }
 
-    /* Full-screen startup tap prompt for iOS permission */
-    #compass-permission-prompt {
-      display: none;
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background: rgba(0, 0, 0, 0.75);
-      z-index: 9999;
-      justify-content: center;
-      align-items: center;
-      pointer-events: auto;
-      cursor: pointer;
-    }
-    #compass-permission-prompt.visible {
-      display: flex;
-    }
-    #compass-permission-prompt .prompt-box {
-      background: rgba(20, 20, 20, 0.95);
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      border-radius: 14px;
-      padding: 40px 60px;
-      text-align: center;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
-    }
-    #compass-permission-prompt .prompt-box p {
-      font-family: 'Consolas', 'Courier New', monospace;
-      font-size: 28px;
-      color: #fff;
-      margin: 0 0 10px 0;
-    }
-    #compass-permission-prompt .prompt-box small {
-      font-family: Arial, sans-serif;
-      font-size: 18px;
-      color: rgba(255,255,255,0.55);
-    }
   </style>
 </head>
 <body>
-  <!-- iOS compass permission prompt — tap anywhere to grant -->
-  <div id="compass-permission-prompt">
-    <div class="prompt-box">
-      <p>&#x1F9ED; Tap anywhere to enable compass</p>
-      <small>Required once per session on iOS</small>
-    </div>
-  </div>
-
   <!-- Compass Overlay -->
   <div id="compass-overlay">
     <div id="compass-tape-wrapper">
@@ -606,12 +563,25 @@
       setInterval(updatePosition, 60 * 1000);
       setInterval(() => { radarMode = (radarMode === "sr_bref") ? "sr_bvel" : "sr_bref"; }, 1 * 60 * 1000);
       setInterval(() => { if (map) { const current = map.getCenter(); map.setZoom(8); setTimeout(() => map.setView(current, 10), 30 * 1000); }}, 2 * 60 * 1000);
-      setInterval(() => location.reload(), 5 * 60 * 1000);
+
+      // Instead of reloading the whole page (which would re-trigger iOS compass
+      // permission every time), force radar/WWA tiles to re-fetch fresh data by
+      // busting their cache with a timestamp param every 5 minutes.
+      setInterval(() => {
+        const ts = Date.now();
+        if (radarLayer) radarLayer.setParams({ _ts: ts }, true);
+        if (wLayer)     wLayer.setParams({ _ts: ts }, true);
+        if (wwaLayer)   wwaLayer.setParams({ _ts: ts }, true);
+      }, 5 * 60 * 1000);
     }
 
     setup();
 
     // ------------------ Compass Heading Overlay ------------------
+    // Uses GPS coords.heading from the Geolocation API — no extra permission
+    // needed since geolocation is already granted for the map/weather features.
+    // Heading reflects direction of travel, which is ideal for a moving vehicle.
+    // Shows last known heading when stationary (GPS heading is null at rest).
     (function() {
       const TICK_WIDTH = 15;
       const TOTAL_DEGREES = 360;
@@ -622,6 +592,10 @@
       const wrapper = document.getElementById('compass-tape-wrapper');
       const readout = document.getElementById('compass-heading-readout');
       const noSensor = document.getElementById('compass-no-sensor');
+
+      // Hide the iOS permission prompt — not needed with GPS heading
+      const permissionPrompt = document.getElementById('compass-permission-prompt');
+      if (permissionPrompt) permissionPrompt.style.display = 'none';
 
       function buildTape() {
         tape.innerHTML = '';
@@ -656,26 +630,10 @@
       }
       buildTape();
 
-      let currentHeading = null;
-      let hasAbsoluteListener = false;
-
-      // Returns the screen rotation angle in degrees.
-      // On iOS in landscape-left (top of phone points left),
-      // window.orientation = 90 on most devices.
-      function getScreenOrientationOffset() {
-        if (screen.orientation && typeof screen.orientation.angle === 'number') {
-          return screen.orientation.angle;
-        }
-        if (typeof window.orientation === 'number') {
-          // window.orientation: 0=portrait, 90=landscape-right, -90=landscape-left
-          // Convert to the same convention as screen.orientation.angle
-          return window.orientation;
-        }
-        return 0;
-      }
+      let lastHeading = null;
 
       function updateCompassDisplay(heading) {
-        currentHeading = heading;
+        lastHeading = heading;
         const wrapperWidth = wrapper.offsetWidth;
         const halfWrapper = wrapperWidth / 2;
         const middleStart = TOTAL_DEGREES * TICK_WIDTH;
@@ -687,95 +645,41 @@
         readout.textContent = `${Math.round(heading)}\u00B0 ${dirLabel}`;
       }
 
-      function applyHeading(rawHeading) {
-        // Use double-modulo to safely handle negative values from orientation offset
-        const offset = getScreenOrientationOffset();
-        const corrected = ((rawHeading + offset) % 360 + 360) % 360;
-        noSensor.style.display = 'none';
-        updateCompassDisplay(corrected);
-      }
-
-      function handleOrientation(event) {
-        // Skip plain deviceorientation events if we have the absolute listener running
-        if (hasAbsoluteListener && !event._fromAbsolute) return;
-
-        // iOS: webkitCompassHeading gives magnetic north heading of the physical
-        // device top edge. Must be a real finite number — it can be null or NaN
-        // when the compass hasn't calibrated yet.
-        if (typeof event.webkitCompassHeading === 'number' &&
-            isFinite(event.webkitCompassHeading)) {
-          applyHeading(event.webkitCompassHeading);
-          return;
+      function onPosition(pos) {
+        const h = pos.coords.heading;
+        if (typeof h === 'number' && isFinite(h)) {
+          // Active heading from GPS — hide any status message
+          noSensor.style.display = 'none';
+          updateCompassDisplay(h);
+        } else if (lastHeading !== null) {
+          // Stationary — hold the last known heading, show a subtle indicator
+          noSensor.style.display = 'block';
+          noSensor.textContent = 'Stationary \u2014 last heading shown';
         }
-
-        // Android / fallback: alpha is degrees from north (reversed convention)
-        if (typeof event.alpha === 'number' && isFinite(event.alpha)) {
-          applyHeading((360 - event.alpha) % 360);
+        // If lastHeading is also null (first fix, no movement yet), show waiting msg
+        if (lastHeading === null && (h === null || !isFinite(h))) {
+          noSensor.style.display = 'block';
+          noSensor.textContent = 'Waiting for GPS heading\u2026';
         }
       }
 
-      function handleAbsoluteOrientation(event) {
-        if (typeof event.alpha === 'number' && isFinite(event.alpha)) {
-          hasAbsoluteListener = true;
-          event._fromAbsolute = true;
-          handleOrientation(event);
-        }
-      }
-
-      function startListening() {
-        // Android Chrome: prefer deviceorientationabsolute for true-north reference
-        if ('ondeviceorientationabsolute' in window) {
-          window.addEventListener('deviceorientationabsolute', handleAbsoluteOrientation, true);
-        }
-        window.addEventListener('deviceorientation', handleOrientation, true);
-
-        // If no data arrives within 4 seconds, show a message and default to N
-        setTimeout(() => {
-          if (currentHeading === null) {
-            noSensor.style.display = 'block';
-            noSensor.textContent = 'No compass sensor detected';
-            noSensor.style.pointerEvents = 'none';
-            updateCompassDisplay(0);
-          }
-        }, 4000);
-      }
-
-      const permissionPrompt = document.getElementById('compass-permission-prompt');
-
-      // iOS 13+ requires requestPermission() inside a user gesture handler.
-      // We show a full-screen tap overlay so the user can grant permission
-      // with a single tap before the stream starts — no interaction needed after.
-      function requestIOSPermission() {
-        DeviceOrientationEvent.requestPermission()
-          .then(response => {
-            permissionPrompt.classList.remove('visible');
-            if (response === 'granted') {
-              startListening();
-            } else {
-              noSensor.style.display = 'block';
-              noSensor.textContent = 'Compass permission denied';
-            }
-          })
-          .catch(() => {
-            permissionPrompt.classList.remove('visible');
-            noSensor.style.display = 'block';
-            noSensor.textContent = 'Compass unavailable';
-          });
-      }
-
-      // Initialise
-      if (typeof DeviceOrientationEvent === 'undefined') {
-        // No sensor API at all
+      function onError(err) {
         noSensor.style.display = 'block';
-        noSensor.textContent = 'Compass not supported';
-        updateCompassDisplay(0);
-      } else if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-        // iOS 13+ — show full-screen tap prompt on load, dismiss on tap
-        permissionPrompt.classList.add('visible');
-        permissionPrompt.addEventListener('click', requestIOSPermission, { once: true });
+        noSensor.textContent = 'GPS unavailable';
+        console.warn('Compass GPS error:', err);
+      }
+
+      // watchPosition gives continuous updates as the device moves —
+      // much more responsive than getCurrentPosition polling.
+      if (navigator.geolocation) {
+        navigator.geolocation.watchPosition(onPosition, onError, {
+          enableHighAccuracy: true,
+          maximumAge: 1000,
+          timeout: 10000
+        });
       } else {
-        // Android / desktop — start immediately, no permission needed
-        startListening();
+        noSensor.style.display = 'block';
+        noSensor.textContent = 'Geolocation not supported';
       }
     })();
   </script>
