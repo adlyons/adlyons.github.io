@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Front Path Drawer</title>
+<style>
+body { margin: 0; overflow: hidden; font-family: sans-serif; }
+
+/* ------------------ MAP CONTAINER STYLES ------------------ */
+
+#mapContainer {
+    position: absolute; 
+    top: 50px; 
+    left: 50%;
+    transform: translateX(-50%); 
+    width: 80vw; 
+    height: 80vh; 
+    border: 1px solid #ccc;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+    overflow: auto; 
+    background: #f0f0f0; 
+    resize: both; 
+    min-width: 300px;
+    min-height: 200px;
+    z-index: 50; 
+}
+
+#dragHandle {
+    position: sticky; 
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 20px; 
+    background: #555;
+    color: white;
+    font-size: 12px;
+    line-height: 20px;
+    text-align: center;
+    cursor: grab; 
+    z-index: 51; 
+    user-select: none; 
+}
+
+#mapContainer img {
+    display: none; 
+    width: 100%; 
+    height: auto; 
+    position: relative; 
+    top: 0;
+    left: 0;
+    pointer-events: none; 
+}
+
+#canvas {
+    position: absolute;
+    top: 20px; 
+    left: 0;
+    width: 100%; 
+    height: calc(100% - 20px); 
+    cursor: crosshair; 
+    background: transparent !important; 
+    display: block; 
+}
+
+/* ------------------ TOOLBAR STYLES ------------------ */
+
+#toolbar { 
+    position: fixed; 
+    top: 10px; 
+    left: 10px; 
+    background: white; 
+    padding: 10px; 
+    border-radius: 6px; 
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2); 
+    z-index: 100; 
+    display: grid;
+    grid-template-columns: repeat(4, auto);
+    gap: 8px; 
+    transition: width 0.3s ease, height 0.3s ease, padding 0.3s ease, transform 0.3s ease;
+}
+#toolbar button, #toolbar label, #toolbar input[type="color"] { 
+    margin: 0; 
+    padding: 8px 10px; 
+    white-space: nowrap;
+    text-align: center;
+    cursor: pointer;
+    border: 1px solid #ccc; 
+    border-radius: 4px;
+    background: #f8f8f8;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.05);
+    min-width: 0; 
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+#fileInput { display: none; }
+#toggleBtn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    background: #f00; 
+    color: white;
+    border: none;
+    border-radius: 0 6px 0 6px;
+    line-height: 1;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: none; 
+    z-index: 101; 
+    transition: background 0.3s ease;
+}
+
+#colorPicker {
+    padding: 0;
+    height: 38px; 
+    width: 38px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+#toolbar.minimized { width: 38px; height: 38px; padding: 5px; overflow: hidden; display: block; }
+#toolbar.minimized > * { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.3s ease, visibility 0.3s ease; }
+#toolbar.minimized #toggleBtn { opacity: 1; visibility: visible; pointer-events: auto; background: #090; border-radius: 6px; width: 28px; height: 28px; top: 5px; right: 5px; transform: none; }
+#toolbar:not(.minimized) { display: grid; }
+
+#selected-front-banner {
+    position: fixed; 
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #444; 
+    color: white;
+    padding: 8px 15px;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: bold;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease-in-out;
+    z-index: 99;
+}
+#selected-front-banner.show { opacity: 1; visibility: visible; }
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <button id="toggleBtn" title="Minimize/Maximize" style="grid-column: span 4; text-align: right;">X</button>
+  
+  <button id="coldBtn">Cold Front</button>
+  <button id="warmBtn">Warm Front</button>
+  <button id="drylineBtn">Dryline</button>
+  <button id="stationaryBtn">Stationary Front</button>
+  
+  <button id="occludedBtn">Occluded Front</button>
+  <button id="troughBtn">Trough</button>
+  <button id="lowBtn" style="color: red; font-weight: bold;">Low (L)</button>
+  <button id="highBtn" style="color: blue; font-weight: bold;">High (H)</button>
+  
+  <button id="thunderstormBtn" style="background: #ffcc00; font-weight: bold;">Thunderstorm</button>
+  
+  <button id="drawPathBtn">Draw</button>
+  <button id="drawTextBtn">Place Text</button>
+  <input type="color" id="colorPicker" value="#000000" title="Select Line/Text Color">
+  
+  <button id="undoBtn">Undo</button>
+  <button id="eraseBtn">Erase All</button>
+  
+  <input type="file" id="fileInput" accept="image/*" />
+  <label for="fileInput" id="loadMapLabel">Load Map</label>
+  
+  <button id="downloadBtn" style="grid-column: span 4; background: #e6e6e6; font-weight: bold;">Download Map (SVG)</button>
+  
+</div>
+
+<div id="selected-front-banner">Selected: <span id="current-front-name">Cold Front</span></div>
+
+<div id="mapContainer">
+    <div id="dragHandle">Drag Map Here</div>
+    
+    <svg id="canvas">
+        <defs>
+            <g id="coldFrontSymbol" fill="blue" stroke="blue" stroke-width="3">
+                <path d="M 0 -20 L 0 5" stroke="blue" stroke-width="3" fill="none"/>
+                <path d="M 0,-15 L 0,15 L 25,0 Z"/>
+            </g>
+            <g id="warmFrontSymbol" fill="red" stroke="red" stroke-width="3">
+                <path d="M 0 -20 L 0 5" stroke="red" stroke-width="3" fill="none"/>
+                <path d="M 0,-15 A 15,15 0 0,1 0,15 Z"/>
+            </g>
+            <g id="DrylineFrontSymbol" fill="none" stroke="#694b13" stroke-width="3">
+                <path d="M 0,-15 A 15,15 0 0,1 0,15 Z"/>
+            </g>
+            <g id="stationaryFrontSymbol" fill="none" stroke-width="3">
+                <path d="M 0 -20 L 0 5" stroke="blue" stroke-width="3" fill="none"/>
+                <path d="M 0 0 L 0 35" stroke="red" stroke-width="5" fill="none"/>
+                <path d="M 0,-15 L 10,-10 L 0,-5 Z" fill="blue" stroke="blue"/>
+                <path d="M 0,5 A 5,5 0 1,0 0,25" fill="red" stroke="red" />
+            </g>
+            <g id="occludedFrontSymbol" fill="none" stroke="purple" stroke-width="3">
+                <path d="M 0 -20 L 0 20" stroke="purple" stroke-width="3" fill="none"/>
+                <path d="M 0,-15 L 10,-10 L 0,-5 Z" fill="purple" stroke="purple"/>
+                <path d="M 0,0 A 5,5 0 0,0 0,15" fill="purple" stroke="purple" transform="translate(-0, 15) rotate(-180)"/>
+            </g>
+            
+            <text id="lowPressureSymbol" x="0" y="0" font-size="30" font-weight="bold" fill="red" text-anchor="middle" dominant-baseline="central">L</text>
+            <text id="highPressureSymbol" x="0" y="0" font-size="30" font-weight="bold" fill="blue" text-anchor="middle" dominant-baseline="central">H</text>
+
+            <g id="thunderstormSymbol" style="fill:none;stroke:#b00000;stroke-width:2.5;">
+				<path d="m -14.5,-17.5 h 24 L -4.5,2 10,16.5"/>
+				<path d="m -10.5,-17.5 v 37"/>
+				<path d="m 9,16.5 h 1 v -1 z"/>
+            </g>
+
+        </defs>
+    </svg>
+</div>
+
+<script>
+const svg = document.getElementById("canvas");
+const mapContainer = document.getElementById("mapContainer");
+const dragHandle = document.getElementById("dragHandle");
+const fileInput = document.getElementById("fileInput");
+const downloadBtn = document.getElementById("downloadBtn");
+const toolbar = document.getElementById("toolbar");
+const toggleBtn = document.getElementById("toggleBtn");
+const colorPicker = document.getElementById("colorPicker");
+
+const HANDLE_HEIGHT = 20;
+
+let currentMapImage = null; 
+let drawing = false;
+let currentColor = colorPicker.value; // Initialize color from picker
+let currentSymbol = "coldFrontSymbol";
+let isTextMode = false;
+let isPathMode = false;
+
+const banner = document.getElementById('selected-front-banner');
+const frontNameSpan = document.getElementById('current-front-name');
+
+const frontDisplayNames = {
+    "coldFrontSymbol": "Cold Front",
+    "warmFrontSymbol": "Warm Front",
+    "DrylineFrontSymbol": "Dryline",
+    "stationaryFrontSymbol": "Stationary Front",
+    "occludedFrontSymbol": "Occluded Front",
+    "trough": "Trough",
+    "low": "Low Pressure (L)",
+    "high": "High Pressure (H)",
+    "thunderstormSymbol": "Thunderstorm (TS)",
+    "path": "Custom Path",
+    "text": "Text Element"
+};
+
+function updateBanner(symbolId) {
+    const displayName = frontDisplayNames[symbolId] || "Unknown";
+    frontNameSpan.textContent = displayName;
+    
+    banner.classList.add('show');
+    clearTimeout(banner.hideTimeout);
+    banner.hideTimeout = setTimeout(() => {
+        banner.classList.remove('show');
+    }, 2000); 
+}
+
+function setMode(mode, symbolId) {
+    isTextMode = (mode === "text");
+    isPathMode = (mode === "path");
+    
+    if (mode === "front") {
+        currentSymbol = symbolId;
+    } else if (mode === "path" || mode === "text") {
+        currentSymbol = mode;
+    }
+
+    updateBanner(currentSymbol);
+}
+
+// Event Listeners for Modes
+document.getElementById("coldBtn").addEventListener("click", () => setMode("front", "coldFrontSymbol"));
+document.getElementById("warmBtn").addEventListener("click", () => setMode("front", "warmFrontSymbol"));
+document.getElementById("drylineBtn").addEventListener("click", () => setMode("front", "DrylineFrontSymbol"));
+document.getElementById("stationaryBtn").addEventListener("click", () => setMode("front", "stationaryFrontSymbol"));
+document.getElementById("occludedBtn").addEventListener("click", () => setMode("front", "occludedFrontSymbol"));
+document.getElementById("troughBtn").addEventListener("click", () => setMode("front", "trough"));
+document.getElementById("lowBtn").addEventListener("click", () => setMode("front", "low"));
+document.getElementById("highBtn").addEventListener("click", () => setMode("front", "high"));
+document.getElementById("thunderstormBtn").addEventListener("click", () => setMode("front", "thunderstormSymbol")); 
+
+// NEW Drawing Mode Buttons
+document.getElementById("drawPathBtn").addEventListener("click", () => setMode("path"));
+document.getElementById("drawTextBtn").addEventListener("click", () => setMode("text"));
+
+// Color Picker Listener
+colorPicker.addEventListener("input", (e) => {
+    currentColor = e.target.value;
+});
+
+updateBanner(currentSymbol);
+
+// ... (Toolbar, Drag, Image Upload, and Undo/Erase logic remains the same) ...
+
+document.getElementById("eraseBtn").addEventListener("click", () => {
+    svg.querySelectorAll("g.frontGroup").forEach(el => el.remove());
+});
+
+toggleBtn.addEventListener('click', () => {
+    toolbar.classList.toggle('minimized');
+    if (toolbar.classList.contains('minimized')) {
+        toggleBtn.textContent = '+'; 
+    } else {
+        toggleBtn.textContent = 'X'; 
+    }
+});
+
+// === DRAGGABLE LOGIC (Unchanged) ===
+let isDragging = false;
+let offsetX, offsetY;
+
+dragHandle.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    const rect = mapContainer.getBoundingClientRect();
+    offsetX = e.clientX - rect.left;
+    offsetY = e.clientY - rect.top;
+    
+    dragHandle.style.cursor = 'grabbing';
+    e.preventDefault(); 
+});
+
+document.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+
+    let newX = e.clientX - offsetX;
+    let newY = e.clientY - offsetY;
+
+    mapContainer.style.left = `${newX}px`;
+    mapContainer.style.top = `${newY}px`;
+    
+    mapContainer.style.transform = 'none'; 
+});
+
+document.addEventListener('mouseup', () => {
+    if (isDragging) {
+        isDragging = false;
+        dragHandle.style.cursor = 'grab';
+    }
+});
+// =============================
+
+
+// === IMAGE UPLOAD LOGIC (Unchanged) ===
+fileInput.addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            if (currentMapImage) {
+                currentMapImage.remove();
+            }
+
+            currentMapImage = document.createElement('img');
+            currentMapImage.src = event.target.result;
+            currentMapImage.style.display = 'block'; 
+            currentMapImage.id = 'mapImage'; 
+
+            mapContainer.insertBefore(currentMapImage, svg);
+            
+            currentMapImage.onload = () => {
+                const width = currentMapImage.naturalWidth;
+                const height = currentMapImage.naturalHeight;
+                
+                mapContainer.style.width = `${width}px`;
+                mapContainer.style.height = `${height + HANDLE_HEIGHT}px`;
+
+                svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+            };
+        };
+        reader.readAsDataURL(file);
+    }
+});
+// =============================
+
+
+// === DRAWING LOGIC (Main Update) ===
+let pathData = "";
+let currentPathGroup = null;
+
+svg.addEventListener("mousedown", e => {
+    if (e.target.id === 'dragHandle') return;
+    
+    drawing = false; 
+    
+    const isPointSymbol = currentSymbol === "low" || 
+                         currentSymbol === "high" || 
+                         currentSymbol === "thunderstormSymbol";
+
+    if (isTextMode) {
+        // --- NEW: Text Element Placement ---
+        const textContent = prompt("Enter text to place on the map:");
+        if (!textContent) return;
+
+        const textGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        textGroup.classList.add("frontGroup"); 
+        
+        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        text.textContent = textContent;
+        text.setAttribute("x", e.offsetX); 
+        text.setAttribute("y", e.offsetY);
+        text.setAttribute("font-size", "24");
+        text.setAttribute("font-weight", "bold");
+        text.setAttribute("fill", currentColor);
+        text.setAttribute("text-anchor", "start"); 
+        text.setAttribute("dominant-baseline", "central");
+        
+        textGroup.appendChild(text);
+        svg.appendChild(textGroup);
+        
+    } else if (isPointSymbol) {
+        // --- Existing: Low/High/Thunderstorm ---
+        const symbolGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        symbolGroup.classList.add("frontGroup"); 
+        
+        if (currentSymbol === "low" || currentSymbol === "high") {
+            const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            text.textContent = (currentSymbol === "low" ? "L" : "H");
+            
+            text.setAttribute("x", e.offsetX); 
+            text.setAttribute("y", e.offsetY);
+            text.setAttribute("font-size", "60");
+            text.setAttribute("font-weight", "bold");
+            text.setAttribute("fill", currentSymbol === "low" ? "red" : "blue");
+            text.setAttribute("text-anchor", "middle");
+            text.setAttribute("dominant-baseline", "central");
+            
+            symbolGroup.appendChild(text);
+
+        } else if (currentSymbol === "thunderstormSymbol") {
+            const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+            use.setAttribute("href", `#${currentSymbol}`);
+            use.setAttribute("transform", `translate(${e.offsetX},${e.offsetY})`); 
+            symbolGroup.appendChild(use);
+        }
+        
+        svg.appendChild(symbolGroup);
+
+    } else {
+        // --- Existing: Line Drawing (Fronts/Troughs/Custom Path) ---
+        drawing = true;
+        pathData = `M${e.offsetX},${e.offsetY}`;
+
+        currentPathGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        currentPathGroup.classList.add("frontGroup");
+        svg.appendChild(currentPathGroup);
+
+        const newPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        newPath.setAttribute("d", pathData);
+        newPath.setAttribute("fill", "none");
+        newPath.setAttribute("stroke-width", 5);
+
+        let useSymbols = true;
+        let strokeDash = "none";
+        let strokeColor = "black"; // Default for custom path
+
+        if (!isPathMode) {
+            // Front/Trough logic
+            strokeColor = "blue";
+            if (currentSymbol === "warmFrontSymbol") strokeColor = "red";
+            else if (currentSymbol === "DrylineFrontSymbol") strokeColor = "#694b13";
+            else if (currentSymbol === "occludedFrontSymbol") strokeColor = "purple";
+            else if (currentSymbol === "trough") {
+                strokeColor = "black";
+                strokeDash = "45, 40";
+                useSymbols = false;
+            }
+        } else {
+            // NEW: Custom Path logic
+            strokeColor = currentColor;
+            useSymbols = false;
+        }
+
+        newPath.setAttribute("stroke", strokeColor);
+        newPath.setAttribute("stroke-dasharray", strokeDash);
+        currentPathGroup.appendChild(newPath);
+
+        if (useSymbols) {
+            const symbolsGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+            currentPathGroup.appendChild(symbolsGroup);
+            currentPathGroup.symbolsGroup = symbolsGroup;
+        } else {
+            currentPathGroup.symbolsGroup = null;
+        }
+        
+        currentPathGroup.path = newPath;
+        currentPathGroup.symbolId = currentSymbol;
+    }
+});
+
+svg.addEventListener("mousemove", e => {
+    if (!drawing) return;
+    
+    // Line drawing logic is only for Fronts/Troughs/Custom Path (not point or text)
+    if (currentSymbol !== "low" && currentSymbol !== "high" && currentSymbol !== "thunderstormSymbol" && !isTextMode) { 
+        pathData += ` L${e.offsetX},${e.offsetY}`;
+        currentPathGroup.path.setAttribute("d", pathData);
+        
+        if (currentPathGroup.symbolsGroup) {
+            placeSymbols(currentPathGroup.path, currentPathGroup.symbolsGroup, currentPathGroup.symbolId);
+        }
+    }
+});
+
+svg.addEventListener("mouseup", () => { drawing = false; });
+
+function placeSymbols(path, symbolsGroup, symbolId) {
+    symbolsGroup.innerHTML = "";
+    const pathLength = path.getTotalLength();
+
+    let spacing = 60;
+    if (symbolId === "DrylineFrontSymbol") spacing = 30;
+    else if (symbolId === "occludedFrontSymbol") spacing = 50;
+    else spacing = 60;
+
+    for (let dist = 0; dist < pathLength; dist += spacing) {
+        const pt = path.getPointAtLength(dist);
+        const pt2 = path.getPointAtLength(Math.min(dist + 0.1, pathLength));
+        let angle = Math.atan2(pt2.y - pt.y, pt2.x - pt.x) * 180 / Math.PI;
+        angle -= 90; 
+
+        const use = document.createElementNS("http://www.w3.org/2000/svg","use");
+        use.setAttribute("href", `#${symbolId}`); 
+        use.setAttribute("transform", `translate(${pt.x},${pt.y}) rotate(${angle})`);
+        symbolsGroup.appendChild(use);
+    }
+}
+
+document.getElementById("undoBtn").addEventListener("click", () => {
+    const allGroups = svg.querySelectorAll("g.frontGroup");
+    if (allGroups.length > 0) {
+        allGroups[allGroups.length - 1].remove();
+    }
+});
+
+// === SVG Download Logic (Unchanged) ===
+downloadBtn.addEventListener("click", () => {
+    if (!currentMapImage) {
+        alert("Please load a map image first before downloading.");
+        return;
+    }
+    
+    const viewBox = svg.getAttribute('viewBox').split(' ').map(Number);
+    const width = viewBox[2];
+    const height = viewBox[3];
+
+    const background_image_for_svg = document.createElementNS("http://www.w3.org/2000/svg", "image");
+    background_image_for_svg.setAttribute("href", currentMapImage.src);
+    background_image_for_svg.setAttribute("width", width);
+    background_image_for_svg.setAttribute("height", height);
+    background_image_for_svg.setAttribute("x", 0);
+    background_image_for_svg.setAttribute("y", 0);
+    
+    svg.prepend(background_image_for_svg); 
+    
+    const serializer = new XMLSerializer();
+    let source = serializer.serializeToString(svg);
+    
+    source = source.replace('<svg', 
+        `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg"`);
+    
+    if (!source.match(/^<\?xml/)) {
+        source = '<?xml xml version="1.0" standalone="no"?>\r\n' + source;
+    }
+
+    background_image_for_svg.remove(); 
+
+    const url = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(source);
+    
+    const downloadLink = document.createElement("a");
+    downloadLink.href = url;
+    downloadLink.download = "weather_map_with_background.svg"; 
+
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+});
+</script>
+</body>
+</html>

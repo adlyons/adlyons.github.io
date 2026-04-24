@@ -2,589 +2,1299 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Front Path Drawer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<title>Storm Sketch</title>
 <style>
-body { margin: 0; overflow: hidden; font-family: sans-serif; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* ------------------ MAP CONTAINER STYLES ------------------ */
+:root {
+  --bg:             #0b1724;
+  --sidebar:        #0f1e30;
+  --sidebar-border: #1b3050;
+  --btn-bg:         #162640;
+  --btn-hover:      #1d324f;
+  --btn-active:     #1e3a5f;
+  --text:           #d9eaf8;
+  --text-muted:     #4e7090;
+  --accent:         #4a9eff;
 
+  --c-cold:       #3b82f6;
+  --c-warm:       #ef4444;
+  --c-dryline:    #d97706;
+  --c-stationary: #7c3aed;
+  --c-occluded:   #a855f7;
+  --c-trough:     #64748b;
+  --c-low:        #ef4444;
+  --c-high:       #3b82f6;
+  --c-thunder:    #eab308;
+  --c-draw:       #22c55e;
+  --c-text-mode:  #f97316;
+  --c-select:     #4a9eff;
+  --c-eraser:     #f43f5e;
+}
+
+html, body { height: 100%; overflow: hidden; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  height: 100dvh;
+}
+
+/* ================================================================
+   SIDEBAR
+   ================================================================ */
+#sidebar {
+  width: 200px; min-width: 200px;
+  height: 100dvh;
+  background: var(--sidebar);
+  border-right: 1px solid var(--sidebar-border);
+  display: flex; flex-direction: column;
+  overflow-y: auto; overflow-x: hidden;
+  flex-shrink: 0; z-index: 100;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sidebar-border) transparent;
+}
+
+#sidebar-header {
+  padding: 15px 14px 12px;
+  border-bottom: 1px solid var(--sidebar-border);
+  flex-shrink: 0;
+}
+.app-icon { font-size: 24px; line-height: 1; margin-bottom: 5px; }
+.app-name { font-size: 15px; font-weight: 700; }
+.app-tag  { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1.4px; margin-top: 2px; font-weight: 500; }
+
+.section { padding: 9px 8px 5px; border-bottom: 1px solid var(--sidebar-border); flex-shrink: 0; }
+.section-title {
+  display: block; font-size: 9px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1.6px; color: var(--text-muted); padding: 0 6px 6px;
+}
+
+.tool-btn {
+  width: 100%; display: flex; align-items: center; gap: 9px;
+  padding: 7px 10px; margin-bottom: 2px;
+  border: none; border-radius: 7px; border-left: 3px solid transparent;
+  background: transparent; color: var(--text);
+  font-size: 12.5px; font-weight: 500; cursor: pointer;
+  transition: background 0.12s; text-align: left; font-family: inherit;
+}
+.tool-btn:hover  { background: var(--btn-hover); }
+.tool-btn.active { background: var(--btn-active); color:#fff; border-left-color: var(--ind, var(--accent)); }
+.dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--ind, #666); }
+
+/* Slider rows */
+.slider-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 10px 6px;
+}
+.slider-label { font-size: 11px; color: var(--text-muted); flex: 0 0 74px; }
+.slider-row input[type="range"] {
+  flex: 1; accent-color: var(--accent); cursor: pointer;
+  height: 4px; border: none; background: none;
+}
+.slider-val { font-size: 11px; color: var(--text-muted); min-width: 22px; text-align: right; }
+
+/* Color row */
+.color-row { display: flex; align-items: center; gap: 8px; padding: 4px 10px 8px; }
+.color-label { font-size: 12px; color: var(--text-muted); flex: 1; }
+#colorPicker {
+  width: 36px; height: 28px; border: 1px solid var(--sidebar-border);
+  border-radius: 6px; cursor: pointer; background: none; padding: 2px;
+}
+
+/* Footer */
+.sidebar-footer { margin-top: auto; padding: 10px 8px; border-top: 1px solid var(--sidebar-border); flex-shrink: 0; }
+#fileInput, #sessionLoadInput { display: none; }
+
+.action-btn {
+  width: 100%; display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px; margin-bottom: 4px;
+  border: 1px solid transparent; border-radius: 7px;
+  background: var(--btn-bg); color: var(--text);
+  font-size: 12px; font-weight: 500; cursor: pointer;
+  transition: background 0.12s, transform 0.08s;
+  text-align: left; font-family: inherit;
+}
+.action-btn:hover  { background: var(--btn-hover); }
+.action-btn:active { transform: scale(0.98); }
+.action-btn.danger  { color: #fca5a5; }
+.action-btn.danger:hover { background: #3d1515; border-color: #7f1d1d; }
+.action-btn:disabled { opacity: 0.35; pointer-events: none; }
+
+.btn-row { display: flex; gap: 4px; margin-bottom: 4px; }
+.btn-row .action-btn { margin-bottom: 0; }
+
+.download-btn {
+  width: 100%; padding: 9px 10px;
+  background: linear-gradient(135deg, #1a4a9e, #1e5abf);
+  border: 1px solid #2d6ad0; border-radius: 8px;
+  color: white; font-size: 12.5px; font-weight: 700; cursor: pointer;
+  text-align: center; transition: all 0.18s; font-family: inherit; margin-top: 4px;
+}
+.download-btn:hover {
+  background: linear-gradient(135deg, #1e5abf, #2563eb);
+  box-shadow: 0 4px 16px rgba(37,99,235,.35); transform: translateY(-1px);
+}
+.btn-row-export { display: flex; gap: 4px; margin-top: 4px; }
+.btn-row-export .download-btn { margin-top: 0; font-size: 11.5px; padding: 8px 6px; }
+
+/* ================================================================
+   MAIN AREA
+   ================================================================ */
+#main {
+  flex: 1; position: relative; overflow: hidden;
+  background:
+    radial-gradient(ellipse at 40% 40%, rgba(74,158,255,.04) 0%, transparent 65%),
+    linear-gradient(rgba(27,48,80,.35) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(27,48,80,.35) 1px, transparent 1px),
+    var(--bg);
+  background-size: 100% 100%, 48px 48px, 48px 48px, 100% 100%;
+}
+
+/* Status banner */
+#status-banner {
+  position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+  background: rgba(15,30,48,.94); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(74,158,255,.2); color: white;
+  padding: 7px 16px 7px 12px; border-radius: 20px;
+  font-size: 12px; font-weight: 600; letter-spacing: .2px;
+  box-shadow: 0 4px 24px rgba(0,0,0,.5);
+  opacity: 0; visibility: hidden; transition: opacity .22s, visibility .22s;
+  z-index: 200; pointer-events: none; white-space: nowrap;
+  display: flex; align-items: center; gap: 7px;
+}
+#status-banner.show { opacity: 1; visibility: visible; }
+#status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--accent); }
+
+/* Zoom controls */
+#zoom-controls {
+  position: absolute; bottom: 18px; right: 18px;
+  display: flex; flex-direction: column; gap: 3px; z-index: 150;
+}
+.zoom-btn {
+  width: 32px; height: 32px; border: 1px solid var(--sidebar-border);
+  border-radius: 7px; background: rgba(15,30,48,.88); backdrop-filter: blur(8px);
+  color: var(--text); font-size: 16px; font-weight: 600; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .12s; user-select: none; font-family: inherit;
+}
+.zoom-btn:hover { background: rgba(29,50,79,.95); }
+#zoom-pct { font-size: 9px; letter-spacing: .5px; font-weight: 700; color: var(--text-muted); text-align: center; }
+
+/* Map container */
 #mapContainer {
-    position: absolute; 
-    top: 50px; 
-    left: 50%;
-    transform: translateX(-50%); 
-    width: 80vw; 
-    height: 80vh; 
-    border: 1px solid #ccc;
-    box-shadow: 0 0 10px rgba(0,0,0,0.5);
-    overflow: auto; 
-    background: #f0f0f0; 
-    resize: both; 
-    min-width: 300px;
-    min-height: 200px;
-    z-index: 50; 
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  width: 84%; height: 82%;
+  border: 1px solid #233e61;
+  box-shadow: 0 0 0 1px rgba(74,158,255,.07), 0 20px 60px rgba(0,0,0,.65);
+  overflow: hidden; background: #dde8f2; border-radius: 10px;
+  min-width: 300px; min-height: 200px; z-index: 50; resize: both;
 }
 
 #dragHandle {
-    position: sticky; 
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 20px; 
-    background: #555;
-    color: white;
-    font-size: 12px;
-    line-height: 20px;
-    text-align: center;
-    cursor: grab; 
-    z-index: 51; 
-    user-select: none; 
+  position: absolute; top: 0; left: 0; width: 100%; height: 32px;
+  background: linear-gradient(135deg, #0f1e30 0%, #162640 100%);
+  color: var(--text-muted); font-size: 10px; font-weight: 600;
+  text-align: center; cursor: grab; z-index: 51; user-select: none;
+  letter-spacing: 1.8px; text-transform: uppercase; border-radius: 9px 9px 0 0;
+  transition: color .15s, background .15s; display: flex; align-items: center;
+  justify-content: center; gap: 8px; touch-action: none;
 }
+#dragHandle:hover { color: var(--text); background: linear-gradient(135deg,#162640,#1d324f); }
 
 #mapContainer img {
-    display: none; 
-    width: 100%; 
-    height: auto; 
-    position: relative; 
-    top: 0;
-    left: 0;
-    pointer-events: none; 
+  display: none; position: absolute; top: 32px; left: 0;
+  width: 100%; height: auto; pointer-events: none;
 }
 
 #canvas {
-    position: absolute;
-    top: 20px; 
-    left: 0;
-    width: 100%; 
-    height: calc(100% - 20px); 
-    cursor: crosshair; 
-    background: transparent !important; 
-    display: block; 
+  position: absolute; top: 32px; left: 0;
+  width: 100%; height: calc(100% - 32px);
+  cursor: crosshair; background: transparent !important; display: block;
+  touch-action: none;
+}
+#canvas.cursor-select  { cursor: default; }
+#canvas.cursor-move    { cursor: move; }
+#canvas.cursor-eraser  { cursor: none; }
+#canvas.cursor-grab    { cursor: grab; }
+#canvas.cursor-grabbing{ cursor: grabbing; }
+
+/* Hint overlay */
+#hint {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  text-align: center; color: var(--text-muted); pointer-events: none; user-select: none;
+}
+#hint-icon { font-size: 36px; margin-bottom: 8px; opacity: .4; }
+#hint-text { font-size: 13px; font-weight: 500; opacity: .6; }
+#hint-sub  { font-size: 11px; opacity: .4; margin-top: 4px; }
+
+/* SVG selection rect + eraser cursor */
+.sel-rect {
+  fill: rgba(74,158,255,.07); stroke: #4a9eff;
+  stroke-width: 1.5; stroke-dasharray: 6 3;
+  pointer-events: none;
+}
+.eraser-ring {
+  fill: rgba(244,63,94,.1); stroke: #f43f5e;
+  stroke-width: 1.5; pointer-events: none;
 }
 
-/* ------------------ TOOLBAR STYLES ------------------ */
+/* ================================================================
+   MOBILE
+   ================================================================ */
+#mobile-toolbar {
+  display: none; position: fixed; bottom: 0; left: 0; right: 0;
+  background: var(--sidebar); border-top: 1px solid var(--sidebar-border);
+  padding: 8px 8px max(env(safe-area-inset-bottom,0px),6px);
+  z-index: 500; overflow-x: auto; overflow-y: hidden;
+  -webkit-overflow-scrolling: touch; scrollbar-width: none;
+}
+#mobile-toolbar::-webkit-scrollbar { display: none; }
+.mobile-row { display: flex; gap: 5px; min-width: max-content; padding: 0 2px; }
+.mobile-btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; padding: 7px 10px 6px; border: none; border-radius: 8px;
+  background: var(--btn-bg); color: var(--text); font-size: 9px; font-weight: 700;
+  cursor: pointer; min-width: 50px; font-family: inherit;
+  border-bottom: 3px solid transparent; transition: background .12s, border-color .12s;
+  text-transform: uppercase; letter-spacing: .4px; text-align: center;
+}
+.mobile-btn.active { background: var(--btn-active); border-bottom-color: var(--ind, var(--accent)); color: #fff; }
+.mobile-btn-icon { font-size: 18px; line-height: 1; }
+.mobile-sep { width: 1px; background: var(--sidebar-border); margin: 0 3px; flex-shrink: 0; }
 
-#toolbar { 
-    position: fixed; 
-    top: 10px; 
-    left: 10px; 
-    background: white; 
-    padding: 10px; 
-    border-radius: 6px; 
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2); 
-    z-index: 100; 
-    display: grid;
-    grid-template-columns: repeat(4, auto);
-    gap: 8px; 
-    transition: width 0.3s ease, height 0.3s ease, padding 0.3s ease, transform 0.3s ease;
+#hamburger {
+  display: none; position: fixed; top: 10px; right: 10px;
+  width: 38px; height: 38px; background: var(--sidebar);
+  border: 1px solid var(--sidebar-border); border-radius: 8px;
+  color: var(--text); font-size: 18px; cursor: pointer; z-index: 600;
+  align-items: center; justify-content: center; transition: background .12s;
 }
-#toolbar button, #toolbar label, #toolbar input[type="color"] { 
-    margin: 0; 
-    padding: 8px 10px; 
-    white-space: nowrap;
-    text-align: center;
-    cursor: pointer;
-    border: 1px solid #ccc; 
-    border-radius: 4px;
-    background: #f8f8f8;
-    box-shadow: 0 1px 1px rgba(0,0,0,0.05);
-    min-width: 0; 
-    transition: opacity 0.3s ease, visibility 0.3s ease;
-}
-#fileInput { display: none; }
-#toggleBtn {
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 28px;
-    height: 28px;
-    padding: 0;
-    background: #f00; 
-    color: white;
-    border: none;
-    border-radius: 0 6px 0 6px;
-    line-height: 1;
-    font-size: 14px;
-    font-weight: bold;
-    cursor: pointer;
-    box-shadow: none; 
-    z-index: 101; 
-    transition: background 0.3s ease;
-}
+#hamburger:hover { background: var(--btn-hover); }
 
-#colorPicker {
-    padding: 0;
-    height: 38px; 
-    width: 38px;
-    border-radius: 4px;
-    cursor: pointer;
+#overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 400;
 }
+#overlay.show { display: block; }
 
-#toolbar.minimized { width: 38px; height: 38px; padding: 5px; overflow: hidden; display: block; }
-#toolbar.minimized > * { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.3s ease, visibility 0.3s ease; }
-#toolbar.minimized #toggleBtn { opacity: 1; visibility: visible; pointer-events: auto; background: #090; border-radius: 6px; width: 28px; height: 28px; top: 5px; right: 5px; transform: none; }
-#toolbar:not(.minimized) { display: grid; }
-
-#selected-front-banner {
-    position: fixed; 
-    top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #444; 
-    color: white;
-    padding: 8px 15px;
-    border-radius: 6px;
-    font-size: 16px;
-    font-weight: bold;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-    opacity: 0;
-    visibility: hidden;
-    transition: all 0.3s ease-in-out;
-    z-index: 99;
+/* ================================================================
+   RESPONSIVE
+   ================================================================ */
+@media (max-width: 640px) {
+  body { display: block; height: 100dvh; }
+  #sidebar {
+    position: fixed; top: 0; left: -204px; height: 100dvh; width: 200px;
+    z-index: 500; transition: left .28s cubic-bezier(.4,0,.2,1);
+    box-shadow: 4px 0 24px rgba(0,0,0,.5);
+  }
+  #sidebar.open { left: 0; }
+  #mobile-toolbar { display: block; }
+  #hamburger { display: flex; }
+  #main { height: 100dvh; width: 100%; }
+  #mapContainer {
+    width: calc(100vw - 16px); height: calc(100dvh - 130px);
+    top: 8px; left: 8px; transform: none; resize: none;
+  }
+  #zoom-controls { bottom: 140px; }
 }
-#selected-front-banner.show { opacity: 1; visibility: visible; }
 </style>
 </head>
 <body>
 
-<div id="toolbar">
-  <button id="toggleBtn" title="Minimize/Maximize" style="grid-column: span 4; text-align: right;">X</button>
-  
-  <button id="coldBtn">Cold Front</button>
-  <button id="warmBtn">Warm Front</button>
-  <button id="drylineBtn">Dryline</button>
-  <button id="stationaryBtn">Stationary Front</button>
-  
-  <button id="occludedBtn">Occluded Front</button>
-  <button id="troughBtn">Trough</button>
-  <button id="lowBtn" style="color: red; font-weight: bold;">Low (L)</button>
-  <button id="highBtn" style="color: blue; font-weight: bold;">High (H)</button>
-  
-  <button id="thunderstormBtn" style="background: #ffcc00; font-weight: bold;">Thunderstorm</button>
-  
-  <button id="drawPathBtn">Draw</button>
-  <button id="drawTextBtn">Place Text</button>
-  <input type="color" id="colorPicker" value="#000000" title="Select Line/Text Color">
-  
-  <button id="undoBtn">Undo</button>
-  <button id="eraseBtn">Erase All</button>
-  
-  <input type="file" id="fileInput" accept="image/*" />
-  <label for="fileInput" id="loadMapLabel">Load Map</label>
-  
-  <button id="downloadBtn" style="grid-column: span 4; background: #e6e6e6; font-weight: bold;">Download Map (SVG)</button>
-  
+<!-- ================================================================
+     SIDEBAR
+     ================================================================ -->
+<div id="sidebar">
+  <div id="sidebar-header">
+    <div class="app-icon">🌩️</div>
+    <div class="app-name">Storm Sketch</div>
+    <div class="app-tag">Weather Map Tool</div>
+  </div>
+
+  <!-- FRONTS -->
+  <div class="section">
+    <span class="section-title">Fronts</span>
+    <button class="tool-btn" data-sym="coldFrontSymbol"      style="--ind:var(--c-cold)"><span class="dot" style="background:var(--c-cold)"></span>Cold Front</button>
+    <button class="tool-btn" data-sym="warmFrontSymbol"      style="--ind:var(--c-warm)"><span class="dot" style="background:var(--c-warm)"></span>Warm Front</button>
+    <button class="tool-btn" data-sym="DrylineFrontSymbol"   style="--ind:var(--c-dryline)"><span class="dot" style="background:var(--c-dryline)"></span>Dryline</button>
+    <button class="tool-btn" data-sym="stationaryFrontSymbol" style="--ind:var(--c-stationary)"><span class="dot" style="background:var(--c-stationary)"></span>Stationary</button>
+    <button class="tool-btn" data-sym="occludedFrontSymbol"  style="--ind:var(--c-occluded)"><span class="dot" style="background:var(--c-occluded)"></span>Occluded Front</button>
+    <button class="tool-btn" data-sym="trough"               style="--ind:var(--c-trough)"><span class="dot" style="background:var(--c-trough)"></span>Trough</button>
+  </div>
+
+  <!-- PRESSURE -->
+  <div class="section">
+    <span class="section-title">Pressure</span>
+    <button class="tool-btn" data-sym="low"  style="--ind:var(--c-low)">
+      <span class="dot" style="background:var(--c-low)"></span>
+      <span style="color:#ef4444;font-weight:800;font-size:14px">L</span>&thinsp;Low Pressure
+    </button>
+    <button class="tool-btn" data-sym="high" style="--ind:var(--c-high)">
+      <span class="dot" style="background:var(--c-high)"></span>
+      <span style="color:#3b82f6;font-weight:800;font-size:14px">H</span>&thinsp;High Pressure
+    </button>
+  </div>
+
+  <!-- WEATHER -->
+  <div class="section">
+    <span class="section-title">Weather</span>
+    <button class="tool-btn" data-sym="thunderstormSymbol" style="--ind:var(--c-thunder)">
+      <span class="dot" style="background:var(--c-thunder)"></span>Thunderstorm
+    </button>
+  </div>
+
+  <!-- TOOLS -->
+  <div class="section">
+    <span class="section-title">Tools</span>
+    <button class="tool-btn" data-sym="path"   style="--ind:var(--c-draw)">     <span class="dot" style="background:var(--c-draw)"></span>Custom Path</button>
+    <button class="tool-btn" data-sym="text"   style="--ind:var(--c-text-mode)"><span class="dot" style="background:var(--c-text-mode)"></span>Place Text</button>
+    <button class="tool-btn" data-sym="select" style="--ind:var(--c-select)">   <span class="dot" style="background:var(--c-select)"></span>Select / Move</button>
+    <button class="tool-btn" data-sym="eraser" style="--ind:var(--c-eraser)">   <span class="dot" style="background:var(--c-eraser)"></span>Eraser</button>
+  </div>
+
+  <!-- STYLE -->
+  <div class="section">
+    <span class="section-title">Style</span>
+    <div class="color-row">
+      <span class="color-label">Line Color</span>
+      <input type="color" id="colorPicker" value="#000000" title="Pick color" />
+    </div>
+    <div class="slider-row">
+      <span class="slider-label">Stroke Width</span>
+      <input type="range" id="strokeWidth" min="1" max="20" value="5" />
+      <span class="slider-val" id="strokeWidthVal">5</span>
+    </div>
+    <div class="slider-row">
+      <span class="slider-label">Text Size</span>
+      <input type="range" id="fontSize" min="10" max="80" value="24" step="2" />
+      <span class="slider-val" id="fontSizeVal">24</span>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="sidebar-footer">
+    <input type="file" id="fileInput" accept="image/*" />
+    <label for="fileInput" class="action-btn" style="cursor:pointer">🗺️&ensp;Load Map Image</label>
+
+    <div class="btn-row">
+      <button class="action-btn" id="undoBtn"  style="flex:1">↩️ Undo</button>
+      <button class="action-btn" id="redoBtn"  style="flex:1">↪️ Redo</button>
+    </div>
+    <button class="action-btn danger" id="eraseAllBtn">🗑️&ensp;Clear All</button>
+
+    <div class="btn-row" style="margin-top:4px">
+      <button class="action-btn" id="saveSessionBtn"  style="flex:1;font-size:11px">💾 Save</button>
+      <input type="file" id="sessionLoadInput" accept=".json" />
+      <label for="sessionLoadInput" class="action-btn" style="flex:1;font-size:11px;cursor:pointer">📂 Load</label>
+    </div>
+
+    <div class="btn-row-export">
+      <button class="download-btn" id="downloadSVG">↓ SVG</button>
+      <button class="download-btn" id="downloadPNG" style="background:linear-gradient(135deg,#14532d,#166534);border-color:#15803d">↓ PNG</button>
+    </div>
+  </div>
 </div>
 
-<div id="selected-front-banner">Selected: <span id="current-front-name">Cold Front</span></div>
+<!-- ================================================================
+     MAIN AREA
+     ================================================================ -->
+<div id="main">
+  <div id="status-banner">
+    <span id="status-dot"></span>
+    <span>Selected:&ensp;</span><span id="status-name">Cold Front</span>
+  </div>
 
-<div id="mapContainer">
-    <div id="dragHandle">Drag Map Here</div>
-    
+  <!-- Zoom controls -->
+  <div id="zoom-controls">
+    <button class="zoom-btn" id="zoomInBtn"  title="Zoom in">+</button>
+    <div   id="zoom-pct">100%</div>
+    <button class="zoom-btn" id="zoomOutBtn" title="Zoom out">−</button>
+    <button class="zoom-btn" id="zoomReset" title="Reset view" style="font-size:13px">⌂</button>
+  </div>
+
+  <div id="mapContainer">
+    <div id="dragHandle">
+      <svg width="14" height="10" viewBox="0 0 14 10" fill="none"><rect y="0" width="14" height="2" rx="1" fill="#8aa5c0"/><rect y="4" width="14" height="2" rx="1" fill="#8aa5c0"/><rect y="8" width="14" height="2" rx="1" fill="#8aa5c0"/></svg>
+      Drag to Move
+    </div>
+
+    <div id="hint">
+      <div id="hint-icon">🗺️</div>
+      <div id="hint-text">Load a map or draw directly</div>
+      <div id="hint-sub">Scroll to zoom · Shift+draw = straight line</div>
+    </div>
+
     <svg id="canvas">
-        <defs>
-            <g id="coldFrontSymbol" fill="blue" stroke="blue" stroke-width="3">
-                <path d="M 0 -20 L 0 5" stroke="blue" stroke-width="3" fill="none"/>
-                <path d="M 0,-15 L 0,15 L 25,0 Z"/>
-            </g>
-            <g id="warmFrontSymbol" fill="red" stroke="red" stroke-width="3">
-                <path d="M 0 -20 L 0 5" stroke="red" stroke-width="3" fill="none"/>
-                <path d="M 0,-15 A 15,15 0 0,1 0,15 Z"/>
-            </g>
-            <g id="DrylineFrontSymbol" fill="none" stroke="#694b13" stroke-width="3">
-                <path d="M 0,-15 A 15,15 0 0,1 0,15 Z"/>
-            </g>
-            <g id="stationaryFrontSymbol" fill="none" stroke-width="3">
-                <path d="M 0 -20 L 0 5" stroke="blue" stroke-width="3" fill="none"/>
-                <path d="M 0 0 L 0 35" stroke="red" stroke-width="5" fill="none"/>
-                <path d="M 0,-15 L 10,-10 L 0,-5 Z" fill="blue" stroke="blue"/>
-                <path d="M 0,5 A 5,5 0 1,0 0,25" fill="red" stroke="red" />
-            </g>
-            <g id="occludedFrontSymbol" fill="none" stroke="purple" stroke-width="3">
-                <path d="M 0 -20 L 0 20" stroke="purple" stroke-width="3" fill="none"/>
-                <path d="M 0,-15 L 10,-10 L 0,-5 Z" fill="purple" stroke="purple"/>
-                <path d="M 0,0 A 5,5 0 0,0 0,15" fill="purple" stroke="purple" transform="translate(-0, 15) rotate(-180)"/>
-            </g>
-            
-            <text id="lowPressureSymbol" x="0" y="0" font-size="30" font-weight="bold" fill="red" text-anchor="middle" dominant-baseline="central">L</text>
-            <text id="highPressureSymbol" x="0" y="0" font-size="30" font-weight="bold" fill="blue" text-anchor="middle" dominant-baseline="central">H</text>
-
-            <g id="thunderstormSymbol" style="fill:none;stroke:#b00000;stroke-width:2.5;">
-				<path d="m -14.5,-17.5 h 24 L -4.5,2 10,16.5"/>
-				<path d="m -10.5,-17.5 v 37"/>
-				<path d="m 9,16.5 h 1 v -1 z"/>
-            </g>
-
-        </defs>
+      <defs>
+        <filter id="sel-glow" x="-30%" y="-30%" width="160%" height="160%">
+          <feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#4a9eff" flood-opacity="0.7"/>
+        </filter>
+        <g id="coldFrontSymbol" fill="blue" stroke="blue" stroke-width="3">
+          <path d="M 0 -20 L 0 5" stroke="blue" stroke-width="3" fill="none"/>
+          <path d="M 0,-15 L 0,15 L 25,0 Z"/>
+        </g>
+        <g id="warmFrontSymbol" fill="red" stroke="red" stroke-width="3">
+          <path d="M 0 -20 L 0 5" stroke="red" stroke-width="3" fill="none"/>
+          <path d="M 0,-15 A 15,15 0 0,1 0,15 Z"/>
+        </g>
+        <g id="DrylineFrontSymbol" fill="none" stroke="#694b13" stroke-width="3">
+          <path d="M 0,-15 A 15,15 0 0,1 0,15 Z"/>
+        </g>
+        <g id="stationaryFrontSymbol" fill="none" stroke-width="3">
+          <path d="M 0 -20 L 0 5"  stroke="blue" stroke-width="3" fill="none"/>
+          <path d="M 0 0 L 0 35"   stroke="red"  stroke-width="5" fill="none"/>
+          <path d="M 0,-15 L 10,-10 L 0,-5 Z" fill="blue" stroke="blue"/>
+          <path d="M 0,5 A 5,5 0 1,0 0,25"    fill="red"  stroke="red"/>
+        </g>
+        <g id="occludedFrontSymbol" fill="none" stroke="purple" stroke-width="3">
+          <path d="M 0 -20 L 0 20" stroke="purple" stroke-width="3" fill="none"/>
+          <path d="M 0,-15 L 10,-10 L 0,-5 Z" fill="purple" stroke="purple"/>
+          <path d="M 0,0 A 5,5 0 0,0 0,15" fill="purple" stroke="purple" transform="translate(-0,15) rotate(-180)"/>
+        </g>
+        <g id="thunderstormSymbol" style="fill:none;stroke:#b00000;stroke-width:2.5;">
+          <path d="m -14.5,-17.5 h 24 L -4.5,2 10,16.5"/>
+          <path d="m -10.5,-17.5 v 37"/>
+          <path d="m 9,16.5 h 1 v -1 z"/>
+        </g>
+      </defs>
+      <!-- Selection rect (always on top) -->
+      <rect id="sel-rect" class="sel-rect" display="none"/>
+      <!-- Eraser ring cursor -->
+      <circle id="eraser-ring" class="eraser-ring" r="20" display="none"/>
     </svg>
+  </div>
 </div>
 
+<!-- Mobile -->
+<button id="hamburger" title="Open tools">☰</button>
+<div id="overlay"></div>
+<div id="mobile-toolbar">
+  <div class="mobile-row">
+    <button class="mobile-btn" data-sym="coldFrontSymbol"      style="--ind:var(--c-cold)">     <span class="mobile-btn-icon">❄️</span>Cold</button>
+    <button class="mobile-btn" data-sym="warmFrontSymbol"      style="--ind:var(--c-warm)">     <span class="mobile-btn-icon">🌡️</span>Warm</button>
+    <button class="mobile-btn" data-sym="DrylineFrontSymbol"   style="--ind:var(--c-dryline)">  <span class="mobile-btn-icon">🌾</span>Dry</button>
+    <button class="mobile-btn" data-sym="stationaryFrontSymbol" style="--ind:var(--c-stationary)"><span class="mobile-btn-icon">↔️</span>Stat.</button>
+    <button class="mobile-btn" data-sym="occludedFrontSymbol"  style="--ind:var(--c-occluded)"> <span class="mobile-btn-icon">🌀</span>Occ.</button>
+    <button class="mobile-btn" data-sym="trough"               style="--ind:var(--c-trough)">   <span class="mobile-btn-icon">〰️</span>Trough</button>
+    <button class="mobile-btn" data-sym="low"                  style="--ind:var(--c-low)">      <span class="mobile-btn-icon" style="color:#ef4444;font-weight:900;font-size:20px">L</span>Low</button>
+    <button class="mobile-btn" data-sym="high"                 style="--ind:var(--c-high)">     <span class="mobile-btn-icon" style="color:#3b82f6;font-weight:900;font-size:20px">H</span>High</button>
+    <button class="mobile-btn" data-sym="thunderstormSymbol"   style="--ind:var(--c-thunder)">  <span class="mobile-btn-icon">⚡</span>Storm</button>
+    <button class="mobile-btn" data-sym="path"                 style="--ind:var(--c-draw)">     <span class="mobile-btn-icon">✏️</span>Path</button>
+    <button class="mobile-btn" data-sym="text"                 style="--ind:var(--c-text-mode)"><span class="mobile-btn-icon">🔤</span>Text</button>
+    <button class="mobile-btn" data-sym="select"               style="--ind:var(--c-select)">   <span class="mobile-btn-icon">⬚</span>Select</button>
+    <button class="mobile-btn" data-sym="eraser"               style="--ind:var(--c-eraser)">   <span class="mobile-btn-icon">🧹</span>Erase</button>
+    <div class="mobile-sep"></div>
+    <button class="mobile-btn" id="m-undo">    <span class="mobile-btn-icon">↩️</span>Undo</button>
+    <button class="mobile-btn" id="m-redo">    <span class="mobile-btn-icon">↪️</span>Redo</button>
+    <button class="mobile-btn" id="m-erase">   <span class="mobile-btn-icon">🗑️</span>Clear</button>
+    <label for="fileInput"  class="mobile-btn" style="cursor:pointer"><span class="mobile-btn-icon">🗺️</span>Load</label>
+    <button class="mobile-btn" id="m-svgdl">   <span class="mobile-btn-icon">⬇️</span>SVG</button>
+    <button class="mobile-btn" id="m-pngdl">   <span class="mobile-btn-icon">📷</span>PNG</button>
+  </div>
+</div>
+
+<!-- ================================================================
+     SCRIPT
+     ================================================================ -->
 <script>
-const svg = document.getElementById("canvas");
-const mapContainer = document.getElementById("mapContainer");
-const dragHandle = document.getElementById("dragHandle");
-const fileInput = document.getElementById("fileInput");
-const downloadBtn = document.getElementById("downloadBtn");
-const toolbar = document.getElementById("toolbar");
-const toggleBtn = document.getElementById("toggleBtn");
-const colorPicker = document.getElementById("colorPicker");
+/* ========== DOM REFS ========== */
+const svg          = document.getElementById('canvas');
+const mapContainer = document.getElementById('mapContainer');
+const dragHandle   = document.getElementById('dragHandle');
+const fileInput    = document.getElementById('fileInput');
+const colorPicker  = document.getElementById('colorPicker');
+const strokeInput  = document.getElementById('strokeWidth');
+const fontInput    = document.getElementById('fontSize');
+const banner       = document.getElementById('status-banner');
+const statusDot    = document.getElementById('status-dot');
+const statusName   = document.getElementById('status-name');
+const hint         = document.getElementById('hint');
+const selRect      = document.getElementById('sel-rect');
+const eraserRing   = document.getElementById('eraser-ring');
+const zoomPct      = document.getElementById('zoom-pct');
 
-const HANDLE_HEIGHT = 20;
+const HANDLE_H = 32;
 
-let currentMapImage = null; 
-let drawing = false;
-let currentColor = colorPicker.value; // Initialize color from picker
-let currentSymbol = "coldFrontSymbol";
-let isTextMode = false;
-let isPathMode = false;
+/* ========== STYLE STATE ========== */
+let currentColor       = colorPicker.value;
+let currentStrokeWidth = 5;
+let currentFontSize    = 24;
 
-const banner = document.getElementById('selected-front-banner');
-const frontNameSpan = document.getElementById('current-front-name');
+/* ========== MAP IMAGE ========== */
+let currentMapImage = null;
 
-const frontDisplayNames = {
-    "coldFrontSymbol": "Cold Front",
-    "warmFrontSymbol": "Warm Front",
-    "DrylineFrontSymbol": "Dryline",
-    "stationaryFrontSymbol": "Stationary Front",
-    "occludedFrontSymbol": "Occluded Front",
-    "trough": "Trough",
-    "low": "Low Pressure (L)",
-    "high": "High Pressure (H)",
-    "thunderstormSymbol": "Thunderstorm (TS)",
-    "path": "Custom Path",
-    "text": "Text Element"
+/* ========== VIEW (viewBox state) ========== */
+const vb = { x: 0, y: 0, w: 800, h: 600 };
+
+function applyVB() {
+  svg.setAttribute('viewBox', `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+  const scale = Math.round((initVB.w / vb.w) * 100);
+  zoomPct.textContent = scale + '%';
+}
+
+const initVB = { w: 800, h: 600 }; // updated on init / image load
+
+function initViewBox() {
+  const r = svg.getBoundingClientRect();
+  vb.x = 0; vb.y = 0;
+  vb.w = r.width  || 800;
+  vb.h = r.height || 600;
+  initVB.w = vb.w; initVB.h = vb.h;
+  applyVB();
+}
+
+function resetView() {
+  vb.x = 0; vb.y = 0;
+  vb.w = initVB.w; vb.h = initVB.h;
+  applyVB();
+}
+
+function zoomAt(cx, cy, factor) {
+  const r = svg.getBoundingClientRect();
+  const fx = (cx - r.left) / r.width;
+  const fy = (cy - r.top)  / r.height;
+  const mx = vb.x + fx * vb.w;
+  const my = vb.y + fy * vb.h;
+  const newW = vb.w / factor;
+  const newH = vb.h / factor;
+  const MIN = initVB.w / 40;
+  const MAX = initVB.w * 8;
+  if (newW < MIN || newW > MAX) return;
+  vb.x = mx - fx * newW;
+  vb.y = my - fy * newH;
+  vb.w = newW; vb.h = newH;
+  applyVB();
+}
+
+function panBy(dCX, dCY) {
+  const r = svg.getBoundingClientRect();
+  vb.x -= (dCX / r.width)  * vb.w;
+  vb.y -= (dCY / r.height) * vb.h;
+  applyVB();
+}
+
+/* ========== SVG COORDS ========== */
+function getSVGCoords(e) {
+  const pt = svg.createSVGPoint();
+  pt.x = e.clientX; pt.y = e.clientY;
+  return pt.matrixTransform(svg.getScreenCTM().inverse());
+}
+
+/* ========== HISTORY ========== */
+const hist = {
+  past: [], future: [],
+  execute(a) { a.exec(); this.past.push(a); this.future = []; this._refresh(); },
+  record(a)  { this.past.push(a); this.future = []; this._refresh(); },
+  undo() {
+    if (!this.past.length) return;
+    const a = this.past.pop(); a.revert(); this.future.push(a);
+    updateHintVisibility(); this._refresh();
+  },
+  redo() {
+    if (!this.future.length) return;
+    const a = this.future.pop(); a.exec(); this.past.push(a);
+    updateHintVisibility(); this._refresh();
+  },
+  _refresh() {
+    document.getElementById('undoBtn').disabled = !this.past.length;
+    document.getElementById('redoBtn').disabled = !this.future.length;
+    document.getElementById('m-undo').disabled  = !this.past.length;
+    document.getElementById('m-redo').disabled  = !this.future.length;
+  }
 };
 
-function updateBanner(symbolId) {
-    const displayName = frontDisplayNames[symbolId] || "Unknown";
-    frontNameSpan.textContent = displayName;
-    
-    banner.classList.add('show');
-    clearTimeout(banner.hideTimeout);
-    banner.hideTimeout = setTimeout(() => {
-        banner.classList.remove('show');
-    }, 2000); 
+function addAction(group) {
+  return {
+    exec:   () => { svg.insertBefore(group, selRect); hideHint(); },
+    revert: () => { group.remove(); updateHintVisibility(); }
+  };
 }
 
-function setMode(mode, symbolId) {
-    isTextMode = (mode === "text");
-    isPathMode = (mode === "path");
-    
-    if (mode === "front") {
-        currentSymbol = symbolId;
-    } else if (mode === "path" || mode === "text") {
-        currentSymbol = mode;
-    }
-
-    updateBanner(currentSymbol);
+function deleteAction(group) {
+  const nxt = group.nextSibling;
+  const wasSel = selectedGroup === group;
+  return {
+    exec:   () => { group.remove(); if (wasSel) deselectAll(); updateHintVisibility(); },
+    revert: () => { svg.insertBefore(group, nxt); }
+  };
 }
 
-// Event Listeners for Modes
-document.getElementById("coldBtn").addEventListener("click", () => setMode("front", "coldFrontSymbol"));
-document.getElementById("warmBtn").addEventListener("click", () => setMode("front", "warmFrontSymbol"));
-document.getElementById("drylineBtn").addEventListener("click", () => setMode("front", "DrylineFrontSymbol"));
-document.getElementById("stationaryBtn").addEventListener("click", () => setMode("front", "stationaryFrontSymbol"));
-document.getElementById("occludedBtn").addEventListener("click", () => setMode("front", "occludedFrontSymbol"));
-document.getElementById("troughBtn").addEventListener("click", () => setMode("front", "trough"));
-document.getElementById("lowBtn").addEventListener("click", () => setMode("front", "low"));
-document.getElementById("highBtn").addEventListener("click", () => setMode("front", "high"));
-document.getElementById("thunderstormBtn").addEventListener("click", () => setMode("front", "thunderstormSymbol")); 
+/* ========== SYMBOL METADATA ========== */
+const symMeta = {
+  coldFrontSymbol:      { name:'Cold Front',        color:'#3b82f6' },
+  warmFrontSymbol:      { name:'Warm Front',         color:'#ef4444' },
+  DrylineFrontSymbol:   { name:'Dryline',            color:'#d97706' },
+  stationaryFrontSymbol:{ name:'Stationary Front',   color:'#7c3aed' },
+  occludedFrontSymbol:  { name:'Occluded Front',     color:'#a855f7' },
+  trough:               { name:'Trough',              color:'#64748b' },
+  low:                  { name:'Low Pressure (L)',   color:'#ef4444' },
+  high:                 { name:'High Pressure (H)',  color:'#3b82f6' },
+  thunderstormSymbol:   { name:'Thunderstorm',        color:'#eab308' },
+  path:                 { name:'Custom Path',         color:'#22c55e' },
+  text:                 { name:'Place Text',          color:'#f97316' },
+  select:               { name:'Select / Move',       color:'#4a9eff' },
+  eraser:               { name:'Eraser',              color:'#f43f5e' },
+};
 
-// NEW Drawing Mode Buttons
-document.getElementById("drawPathBtn").addEventListener("click", () => setMode("path"));
-document.getElementById("drawTextBtn").addEventListener("click", () => setMode("text"));
+/* ========== BANNER ========== */
+let bannerTimer;
+function showBanner(sym) {
+  const m = symMeta[sym] || { name: sym, color: '#4a9eff' };
+  statusName.textContent     = m.name;
+  statusDot.style.background = m.color;
+  banner.classList.add('show');
+  clearTimeout(bannerTimer);
+  bannerTimer = setTimeout(() => banner.classList.remove('show'), 2200);
+}
 
-// Color Picker Listener
-colorPicker.addEventListener("input", (e) => {
-    currentColor = e.target.value;
+/* ========== HINT ========== */
+function hideHint() { if (hint) hint.style.display = 'none'; }
+function showHint() { if (hint) hint.style.display = ''; }
+function updateHintVisibility() {
+  svg.querySelector('g.frontGroup') ? hideHint() : showHint();
+}
+
+/* ========== MODE STATE ========== */
+let currentSymbol = 'coldFrontSymbol';
+const isPoint  = s => ['low','high','thunderstormSymbol'].includes(s);
+const isLine   = s => !isPoint(s) && !['text','select','eraser'].includes(s);
+
+function setActiveBtn(sym) {
+  document.querySelectorAll('[data-sym]').forEach(b =>
+    b.classList.toggle('active', b.dataset.sym === sym));
+}
+
+function setMode(sym) {
+  // Cancel ongoing drawing
+  if (drawing && currentPathGroup) { currentPathGroup.remove(); currentPathGroup = null; drawPoints = []; }
+  drawing = false;
+  if (selectedGroup) deselectAll();
+
+  currentSymbol = sym;
+  setActiveBtn(sym);
+  showBanner(sym);
+
+  const isEraser = sym === 'eraser';
+  const isSel    = sym === 'select';
+  eraserRing.setAttribute('display', 'none');
+  svg.className = isEraser ? 'cursor-eraser' : (isSel ? 'cursor-select' : '');
+}
+
+document.querySelectorAll('[data-sym]').forEach(btn =>
+  btn.addEventListener('click', () => setMode(btn.dataset.sym)));
+
+/* ========== STYLE CONTROLS ========== */
+colorPicker.addEventListener('input', e => { currentColor = e.target.value; });
+
+strokeInput.addEventListener('input', e => {
+  currentStrokeWidth = +e.target.value;
+  document.getElementById('strokeWidthVal').textContent = currentStrokeWidth;
 });
 
-updateBanner(currentSymbol);
-
-// ... (Toolbar, Drag, Image Upload, and Undo/Erase logic remains the same) ...
-
-document.getElementById("eraseBtn").addEventListener("click", () => {
-    svg.querySelectorAll("g.frontGroup").forEach(el => el.remove());
+fontInput.addEventListener('input', e => {
+  currentFontSize = +e.target.value;
+  document.getElementById('fontSizeVal').textContent = currentFontSize;
 });
 
-toggleBtn.addEventListener('click', () => {
-    toolbar.classList.toggle('minimized');
-    if (toolbar.classList.contains('minimized')) {
-        toggleBtn.textContent = '+'; 
-    } else {
-        toggleBtn.textContent = 'X'; 
-    }
-});
+/* ========== SMOOTH PATH (Catmull-Rom → Bézier) ========== */
+function buildPath(pts) {
+  if (pts.length === 1) return `M${f(pts[0].x)},${f(pts[0].y)}`;
+  let d = `M${f(pts[0].x)},${f(pts[0].y)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[Math.min(pts.length - 1, i + 2)];
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+    d += ` C${f(cp1x)},${f(cp1y)} ${f(cp2x)},${f(cp2y)} ${f(p2.x)},${f(p2.y)}`;
+  }
+  return d;
+}
+function f(n) { return n.toFixed(2); }
 
-// === DRAGGABLE LOGIC (Unchanged) ===
-let isDragging = false;
-let offsetX, offsetY;
-
-dragHandle.addEventListener('mousedown', (e) => {
-    isDragging = true;
-    const rect = mapContainer.getBoundingClientRect();
-    offsetX = e.clientX - rect.left;
-    offsetY = e.clientY - rect.top;
-    
-    dragHandle.style.cursor = 'grabbing';
-    e.preventDefault(); 
-});
-
-document.addEventListener('mousemove', (e) => {
-    if (!isDragging) return;
-
-    let newX = e.clientX - offsetX;
-    let newY = e.clientY - offsetY;
-
-    mapContainer.style.left = `${newX}px`;
-    mapContainer.style.top = `${newY}px`;
-    
-    mapContainer.style.transform = 'none'; 
-});
-
-document.addEventListener('mouseup', () => {
-    if (isDragging) {
-        isDragging = false;
-        dragHandle.style.cursor = 'grab';
-    }
-});
-// =============================
-
-
-// === IMAGE UPLOAD LOGIC (Unchanged) ===
-fileInput.addEventListener("change", (e) => {
-    const file = e.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            if (currentMapImage) {
-                currentMapImage.remove();
-            }
-
-            currentMapImage = document.createElement('img');
-            currentMapImage.src = event.target.result;
-            currentMapImage.style.display = 'block'; 
-            currentMapImage.id = 'mapImage'; 
-
-            mapContainer.insertBefore(currentMapImage, svg);
-            
-            currentMapImage.onload = () => {
-                const width = currentMapImage.naturalWidth;
-                const height = currentMapImage.naturalHeight;
-                
-                mapContainer.style.width = `${width}px`;
-                mapContainer.style.height = `${height + HANDLE_HEIGHT}px`;
-
-                svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
-            };
-        };
-        reader.readAsDataURL(file);
-    }
-});
-// =============================
-
-
-// === DRAWING LOGIC (Main Update) ===
-let pathData = "";
+/* ========== DRAWING STATE ========== */
+let drawing          = false;
+let drawPoints       = [];
 let currentPathGroup = null;
 
-svg.addEventListener("mousedown", e => {
-    if (e.target.id === 'dragHandle') return;
-    
-    drawing = false; 
-    
-    const isPointSymbol = currentSymbol === "low" || 
-                         currentSymbol === "high" || 
-                         currentSymbol === "thunderstormSymbol";
-
-    if (isTextMode) {
-        // --- NEW: Text Element Placement ---
-        const textContent = prompt("Enter text to place on the map:");
-        if (!textContent) return;
-
-        const textGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
-        textGroup.classList.add("frontGroup"); 
-        
-        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-        text.textContent = textContent;
-        text.setAttribute("x", e.offsetX); 
-        text.setAttribute("y", e.offsetY);
-        text.setAttribute("font-size", "24");
-        text.setAttribute("font-weight", "bold");
-        text.setAttribute("fill", currentColor);
-        text.setAttribute("text-anchor", "start"); 
-        text.setAttribute("dominant-baseline", "central");
-        
-        textGroup.appendChild(text);
-        svg.appendChild(textGroup);
-        
-    } else if (isPointSymbol) {
-        // --- Existing: Low/High/Thunderstorm ---
-        const symbolGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
-        symbolGroup.classList.add("frontGroup"); 
-        
-        if (currentSymbol === "low" || currentSymbol === "high") {
-            const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-            text.textContent = (currentSymbol === "low" ? "L" : "H");
-            
-            text.setAttribute("x", e.offsetX); 
-            text.setAttribute("y", e.offsetY);
-            text.setAttribute("font-size", "60");
-            text.setAttribute("font-weight", "bold");
-            text.setAttribute("fill", currentSymbol === "low" ? "red" : "blue");
-            text.setAttribute("text-anchor", "middle");
-            text.setAttribute("dominant-baseline", "central");
-            
-            symbolGroup.appendChild(text);
-
-        } else if (currentSymbol === "thunderstormSymbol") {
-            const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
-            use.setAttribute("href", `#${currentSymbol}`);
-            use.setAttribute("transform", `translate(${e.offsetX},${e.offsetY})`); 
-            symbolGroup.appendChild(use);
-        }
-        
-        svg.appendChild(symbolGroup);
-
-    } else {
-        // --- Existing: Line Drawing (Fronts/Troughs/Custom Path) ---
-        drawing = true;
-        pathData = `M${e.offsetX},${e.offsetY}`;
-
-        currentPathGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
-        currentPathGroup.classList.add("frontGroup");
-        svg.appendChild(currentPathGroup);
-
-        const newPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        newPath.setAttribute("d", pathData);
-        newPath.setAttribute("fill", "none");
-        newPath.setAttribute("stroke-width", 5);
-
-        let useSymbols = true;
-        let strokeDash = "none";
-        let strokeColor = "black"; // Default for custom path
-
-        if (!isPathMode) {
-            // Front/Trough logic
-            strokeColor = "blue";
-            if (currentSymbol === "warmFrontSymbol") strokeColor = "red";
-            else if (currentSymbol === "DrylineFrontSymbol") strokeColor = "#694b13";
-            else if (currentSymbol === "occludedFrontSymbol") strokeColor = "purple";
-            else if (currentSymbol === "trough") {
-                strokeColor = "black";
-                strokeDash = "45, 40";
-                useSymbols = false;
-            }
-        } else {
-            // NEW: Custom Path logic
-            strokeColor = currentColor;
-            useSymbols = false;
-        }
-
-        newPath.setAttribute("stroke", strokeColor);
-        newPath.setAttribute("stroke-dasharray", strokeDash);
-        currentPathGroup.appendChild(newPath);
-
-        if (useSymbols) {
-            const symbolsGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
-            currentPathGroup.appendChild(symbolsGroup);
-            currentPathGroup.symbolsGroup = symbolsGroup;
-        } else {
-            currentPathGroup.symbolsGroup = null;
-        }
-        
-        currentPathGroup.path = newPath;
-        currentPathGroup.symbolId = currentSymbol;
-    }
-});
-
-svg.addEventListener("mousemove", e => {
-    if (!drawing) return;
-    
-    // Line drawing logic is only for Fronts/Troughs/Custom Path (not point or text)
-    if (currentSymbol !== "low" && currentSymbol !== "high" && currentSymbol !== "thunderstormSymbol" && !isTextMode) { 
-        pathData += ` L${e.offsetX},${e.offsetY}`;
-        currentPathGroup.path.setAttribute("d", pathData);
-        
-        if (currentPathGroup.symbolsGroup) {
-            placeSymbols(currentPathGroup.path, currentPathGroup.symbolsGroup, currentPathGroup.symbolId);
-        }
-    }
-});
-
-svg.addEventListener("mouseup", () => { drawing = false; });
-
-function placeSymbols(path, symbolsGroup, symbolId) {
-    symbolsGroup.innerHTML = "";
-    const pathLength = path.getTotalLength();
-
-    let spacing = 60;
-    if (symbolId === "DrylineFrontSymbol") spacing = 30;
-    else if (symbolId === "occludedFrontSymbol") spacing = 50;
-    else spacing = 60;
-
-    for (let dist = 0; dist < pathLength; dist += spacing) {
-        const pt = path.getPointAtLength(dist);
-        const pt2 = path.getPointAtLength(Math.min(dist + 0.1, pathLength));
-        let angle = Math.atan2(pt2.y - pt.y, pt2.x - pt.x) * 180 / Math.PI;
-        angle -= 90; 
-
-        const use = document.createElementNS("http://www.w3.org/2000/svg","use");
-        use.setAttribute("href", `#${symbolId}`); 
-        use.setAttribute("transform", `translate(${pt.x},${pt.y}) rotate(${angle})`);
-        symbolsGroup.appendChild(use);
-    }
+function createGroup() {
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  g.classList.add('frontGroup');
+  return g;
 }
 
-document.getElementById("undoBtn").addEventListener("click", () => {
-    const allGroups = svg.querySelectorAll("g.frontGroup");
-    if (allGroups.length > 0) {
-        allGroups[allGroups.length - 1].remove();
+function startLine(coords) {
+  drawPoints = [coords];
+  currentPathGroup = createGroup();
+  svg.insertBefore(currentPathGroup, selRect);
+
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', `M${f(coords.x)},${f(coords.y)}`);
+  path.setAttribute('fill', 'none');
+  path.setAttribute('stroke-width', currentStrokeWidth);
+
+  let strokeColor = 'blue', strokeDash = 'none', useSymbols = true;
+  const s = currentSymbol;
+  if (s === 'path') {
+    strokeColor = currentColor; useSymbols = false;
+  } else {
+    if      (s === 'warmFrontSymbol')     strokeColor = 'red';
+    else if (s === 'DrylineFrontSymbol')  strokeColor = '#694b13';
+    else if (s === 'occludedFrontSymbol') strokeColor = 'purple';
+    else if (s === 'trough')             { strokeColor = 'black'; strokeDash = '45,40'; useSymbols = false; }
+    else if (s === 'stationaryFrontSymbol') strokeColor = 'blue';
+  }
+  path.setAttribute('stroke', strokeColor);
+  path.setAttribute('stroke-dasharray', strokeDash);
+  currentPathGroup.appendChild(path);
+
+  let sg = null;
+  if (useSymbols) {
+    sg = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    currentPathGroup.appendChild(sg);
+  }
+  currentPathGroup._path      = path;
+  currentPathGroup._sg        = sg;
+  currentPathGroup._symbolId  = s;
+}
+
+function updateLine(e, coords) {
+  if (!drawing || !currentPathGroup) return;
+  let pts;
+  if (e.shiftKey && drawPoints.length > 0) {
+    // Snap to nearest 45°
+    const p0 = drawPoints[0];
+    const dx = coords.x - p0.x, dy = coords.y - p0.y;
+    const angle = Math.atan2(dy, dx);
+    const snap  = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
+    const dist  = Math.hypot(dx, dy);
+    pts = [p0, { x: p0.x + dist * Math.cos(snap), y: p0.y + dist * Math.sin(snap) }];
+  } else {
+    // Add point if far enough
+    const last = drawPoints[drawPoints.length - 1];
+    if (Math.hypot(coords.x - last.x, coords.y - last.y) < 2) return;
+    drawPoints.push(coords);
+    pts = drawPoints;
+  }
+  currentPathGroup._path.setAttribute('d', buildPath(pts));
+  if (currentPathGroup._sg) placeSymbols(currentPathGroup._path, currentPathGroup._sg, currentPathGroup._symbolId);
+}
+
+function finishLine(e) {
+  if (!drawing || !currentPathGroup) return;
+  // If shift was held, commit the snapped position
+  if (e && e.shiftKey && drawPoints.length > 0) {
+    const coords = getSVGCoords(e);
+    const p0 = drawPoints[0];
+    const dx = coords.x - p0.x, dy = coords.y - p0.y;
+    const angle = Math.atan2(dy, dx);
+    const snap  = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
+    const dist  = Math.hypot(dx, dy);
+    drawPoints = [p0, { x: p0.x + dist * Math.cos(snap), y: p0.y + dist * Math.sin(snap) }];
+    currentPathGroup._path.setAttribute('d', buildPath(drawPoints));
+    if (currentPathGroup._sg) placeSymbols(currentPathGroup._path, currentPathGroup._sg, currentPathGroup._symbolId);
+  }
+  const g = currentPathGroup;
+  hist.record({
+    exec:   () => { svg.insertBefore(g, selRect); hideHint(); },
+    revert: () => { g.remove(); updateHintVisibility(); }
+  });
+  drawing = false; currentPathGroup = null; drawPoints = [];
+  hideHint();
+}
+
+function placeSymbols(path, sg, symId) {
+  sg.innerHTML = '';
+  const len = path.getTotalLength();
+  const spacing = symId === 'DrylineFrontSymbol' ? 30 : symId === 'occludedFrontSymbol' ? 50 : 60;
+  for (let d = 0; d < len; d += spacing) {
+    const pt  = path.getPointAtLength(d);
+    const pt2 = path.getPointAtLength(Math.min(d + 0.1, len));
+    const ang = Math.atan2(pt2.y - pt.y, pt2.x - pt.x) * 180 / Math.PI - 90;
+    const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+    use.setAttribute('href', `#${symId}`);
+    use.setAttribute('transform', `translate(${f(pt.x)},${f(pt.y)}) rotate(${f(ang)})`);
+    sg.appendChild(use);
+  }
+}
+
+/* ========== PLACE POINT SYMBOLS ========== */
+function placePoint(coords) {
+  const g = createGroup();
+  const s = currentSymbol;
+  if (s === 'low' || s === 'high') {
+    const mbar = prompt(`Optional: enter pressure value in mb (or leave blank):`);
+    const lbl  = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    lbl.textContent = s === 'low' ? 'L' : 'H';
+    lbl.setAttribute('x', f(coords.x)); lbl.setAttribute('y', f(coords.y));
+    lbl.setAttribute('font-size', '60'); lbl.setAttribute('font-weight', 'bold');
+    lbl.setAttribute('fill', s === 'low' ? 'red' : 'blue');
+    lbl.setAttribute('text-anchor', 'middle'); lbl.setAttribute('dominant-baseline', 'central');
+    g.appendChild(lbl);
+    if (mbar && mbar.trim()) {
+      const sub = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      sub.textContent = mbar.trim() + ' mb';
+      sub.setAttribute('x', f(coords.x)); sub.setAttribute('y', f(coords.y + 40));
+      sub.setAttribute('font-size', '18'); sub.setAttribute('font-weight', '600');
+      sub.setAttribute('fill', s === 'low' ? 'red' : 'blue');
+      sub.setAttribute('text-anchor', 'middle'); sub.setAttribute('dominant-baseline', 'central');
+      g.appendChild(sub);
     }
+  } else {
+    const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+    use.setAttribute('href', `#${s}`);
+    use.setAttribute('transform', `translate(${f(coords.x)},${f(coords.y)})`);
+    g.appendChild(use);
+  }
+  hist.execute(addAction(g));
+}
+
+/* ========== PLACE TEXT ========== */
+function placeText(coords) {
+  const content = prompt('Enter text to place on the map:');
+  if (!content) return;
+  const g = createGroup();
+  const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  t.textContent = content;
+  t.setAttribute('x', f(coords.x)); t.setAttribute('y', f(coords.y));
+  t.setAttribute('font-size', currentFontSize);
+  t.setAttribute('font-weight', 'bold');
+  t.setAttribute('fill', currentColor);
+  t.setAttribute('text-anchor', 'start'); t.setAttribute('dominant-baseline', 'central');
+  g.appendChild(t);
+  hist.execute(addAction(g));
+}
+
+/* ========== SELECT & MOVE ========== */
+let selectedGroup = null;
+let isDraggingGroup = false;
+let dragGroupStart  = { svgX: 0, svgY: 0, tx: 0, ty: 0 };
+let moveStartTransform = '';
+
+function deselectAll() {
+  if (selectedGroup) {
+    selectedGroup.removeAttribute('filter');
+    selectedGroup = null;
+  }
+  selRect.setAttribute('display', 'none');
+}
+
+function selectGroup(g) {
+  deselectAll();
+  selectedGroup = g;
+  g.setAttribute('filter', 'url(#sel-glow)');
+  refreshSelRect();
+}
+
+function refreshSelRect() {
+  if (!selectedGroup) return;
+  // Use client rect → SVG coords for correct bounding box under any transform
+  const cr  = selectedGroup.getBoundingClientRect();
+  const ctm = svg.getScreenCTM().inverse();
+  const p1  = svg.createSVGPoint(); p1.x = cr.left;  p1.y = cr.top;
+  const p2  = svg.createSVGPoint(); p2.x = cr.right; p2.y = cr.bottom;
+  const s1  = p1.matrixTransform(ctm);
+  const s2  = p2.matrixTransform(ctm);
+  const pad = 8;
+  selRect.setAttribute('x',      f(s1.x - pad));
+  selRect.setAttribute('y',      f(s1.y - pad));
+  selRect.setAttribute('width',  f(s2.x - s1.x + pad * 2));
+  selRect.setAttribute('height', f(s2.y - s1.y + pad * 2));
+  selRect.setAttribute('display', '');
+}
+
+function getGroupTranslate(g) {
+  const t = g.getAttribute('transform') || '';
+  const m = t.match(/translate\(\s*([^,\s]+)[,\s]+([^)\s]+)\s*\)/);
+  return m ? { x: parseFloat(m[1]), y: parseFloat(m[2]) } : { x: 0, y: 0 };
+}
+
+/* ========== POINTER TRACKING (multi-touch) ========== */
+const ptrs = new Map(); // pointerId -> {x,y}
+let lastPinchDist = null;
+let lastPinchMid  = null;
+let spaceDown     = false;
+let isPanning     = false;
+let panLastPos    = { x: 0, y: 0 };
+
+/* ========== MAIN POINTER EVENTS ON SVG ========== */
+svg.addEventListener('pointerdown', e => {
+  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+  if (ptrs.size >= 2) {
+    // Second finger: cancel drawing, enter pinch mode
+    if (drawing && currentPathGroup) { currentPathGroup.remove(); currentPathGroup = null; drawPoints = []; drawing = false; }
+    lastPinchDist = null; lastPinchMid = null;
+    return;
+  }
+
+  // Single pointer
+  svg.setPointerCapture(e.pointerId);
+  const coords = getSVGCoords(e);
+
+  /* Space → pan */
+  if (spaceDown) {
+    isPanning = true; panLastPos = { x: e.clientX, y: e.clientY };
+    svg.classList.add('cursor-grabbing');
+    e.preventDefault(); return;
+  }
+
+  /* Eraser */
+  if (currentSymbol === 'eraser') {
+    eraseAt(e); e.preventDefault(); return;
+  }
+
+  /* Select */
+  if (currentSymbol === 'select') {
+    const hit = e.target.closest('.frontGroup');
+    if (hit) {
+      selectGroup(hit);
+      isDraggingGroup  = true;
+      moveStartTransform = hit.getAttribute('transform') || '';
+      const t = getGroupTranslate(hit);
+      dragGroupStart = { svgX: coords.x, svgY: coords.y, tx: t.x, ty: t.y };
+      svg.classList.add('cursor-move');
+    } else {
+      deselectAll();
+      // Background drag = pan
+      isPanning = true; panLastPos = { x: e.clientX, y: e.clientY };
+      svg.classList.add('cursor-grabbing');
+    }
+    e.preventDefault(); return;
+  }
+
+  /* Text / point / line */
+  if (currentSymbol === 'text')     { placeText(coords); return; }
+  if (isPoint(currentSymbol))       { placePoint(coords); return; }
+  if (isLine(currentSymbol)) {
+    drawing = true;
+    startLine(coords);
+    e.preventDefault();
+  }
 });
 
-// === SVG Download Logic (Unchanged) ===
-downloadBtn.addEventListener("click", () => {
-    if (!currentMapImage) {
-        alert("Please load a map image first before downloading.");
-        return;
+svg.addEventListener('pointermove', e => {
+  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+  /* Eraser cursor ring */
+  if (currentSymbol === 'eraser') {
+    const c = getSVGCoords(e);
+    eraserRing.setAttribute('cx', f(c.x)); eraserRing.setAttribute('cy', f(c.y));
+    const r = (20 * vb.w) / (svg.getBoundingClientRect().width || 1);
+    eraserRing.setAttribute('r', f(r));
+    eraserRing.setAttribute('display', '');
+    if (ptrs.size === 1 && e.buttons > 0) eraseAt(e);
+    return;
+  }
+
+  /* Pinch zoom */
+  if (ptrs.size >= 2) {
+    const vals = [...ptrs.values()];
+    const dist = Math.hypot(vals[0].x - vals[1].x, vals[0].y - vals[1].y);
+    const mid  = { x: (vals[0].x + vals[1].x) / 2, y: (vals[0].y + vals[1].y) / 2 };
+    if (lastPinchDist !== null) {
+      if (dist > 0) zoomAt(mid.x, mid.y, dist / lastPinchDist);
+      panBy(mid.x - lastPinchMid.x, mid.y - lastPinchMid.y);
     }
-    
-    const viewBox = svg.getAttribute('viewBox').split(' ').map(Number);
-    const width = viewBox[2];
-    const height = viewBox[3];
+    lastPinchDist = dist; lastPinchMid = mid;
+    return;
+  }
 
-    const background_image_for_svg = document.createElementNS("http://www.w3.org/2000/svg", "image");
-    background_image_for_svg.setAttribute("href", currentMapImage.src);
-    background_image_for_svg.setAttribute("width", width);
-    background_image_for_svg.setAttribute("height", height);
-    background_image_for_svg.setAttribute("x", 0);
-    background_image_for_svg.setAttribute("y", 0);
-    
-    svg.prepend(background_image_for_svg); 
-    
-    const serializer = new XMLSerializer();
-    let source = serializer.serializeToString(svg);
-    
-    source = source.replace('<svg', 
-        `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg"`);
-    
-    if (!source.match(/^<\?xml/)) {
-        source = '<?xml xml version="1.0" standalone="no"?>\r\n' + source;
-    }
+  /* Pan */
+  if (isPanning) {
+    panBy(e.clientX - panLastPos.x, e.clientY - panLastPos.y);
+    panLastPos = { x: e.clientX, y: e.clientY };
+    return;
+  }
 
-    background_image_for_svg.remove(); 
+  /* Move selected group */
+  if (isDraggingGroup && selectedGroup) {
+    const coords = getSVGCoords(e);
+    const newTx = dragGroupStart.tx + (coords.x - dragGroupStart.svgX);
+    const newTy = dragGroupStart.ty + (coords.y - dragGroupStart.svgY);
+    selectedGroup.setAttribute('transform', `translate(${f(newTx)},${f(newTy)})`);
+    refreshSelRect();
+    return;
+  }
 
-    const url = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(source);
-    
-    const downloadLink = document.createElement("a");
-    downloadLink.href = url;
-    downloadLink.download = "weather_map_with_background.svg"; 
-
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-    document.body.removeChild(downloadLink);
+  /* Draw line */
+  if (drawing) { updateLine(e, getSVGCoords(e)); return; }
 });
+
+svg.addEventListener('pointerup', e => {
+  ptrs.delete(e.pointerId);
+  if (ptrs.size < 2) { lastPinchDist = null; lastPinchMid = null; }
+
+  if (isPanning) {
+    isPanning = false;
+    svg.classList.remove('cursor-grabbing');
+    svg.className = currentSymbol === 'eraser' ? 'cursor-eraser' : currentSymbol === 'select' ? 'cursor-select' : '';
+  }
+
+  if (isDraggingGroup && selectedGroup) {
+    isDraggingGroup = false;
+    svg.classList.remove('cursor-move');
+    const endT = selectedGroup.getAttribute('transform') || '';
+    if (endT !== moveStartTransform) {
+      const g = selectedGroup, fromT = moveStartTransform, toT = endT;
+      hist.record({
+        exec:   () => { g.setAttribute('transform', toT);   refreshSelRect(); },
+        revert: () => { g.setAttribute('transform', fromT); refreshSelRect(); }
+      });
+    }
+    svg.className = 'cursor-select';
+  }
+
+  if (drawing) finishLine(e);
+});
+
+svg.addEventListener('pointercancel', e => {
+  ptrs.delete(e.pointerId);
+  isPanning = false; isDraggingGroup = false;
+  if (drawing && currentPathGroup) { currentPathGroup.remove(); currentPathGroup = null; drawPoints = []; drawing = false; }
+});
+
+svg.addEventListener('pointerleave', () => {
+  eraserRing.setAttribute('display', 'none');
+});
+
+/* ========== ERASER ========== */
+const erasedThisStroke = new Set();
+function eraseAt(e) {
+  const els = document.elementsFromPoint(e.clientX, e.clientY);
+  for (const el of els) {
+    const g = el.closest && el.closest('.frontGroup');
+    if (g && !erasedThisStroke.has(g)) {
+      erasedThisStroke.add(g);
+      if (g === selectedGroup) deselectAll();
+      hist.execute(deleteAction(g));
+    }
+  }
+}
+svg.addEventListener('pointerdown', () => { if (currentSymbol === 'eraser') erasedThisStroke.clear(); }, { capture: true });
+
+/* ========== WHEEL ZOOM ========== */
+svg.addEventListener('wheel', e => {
+  e.preventDefault();
+  const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+  zoomAt(e.clientX, e.clientY, factor);
+}, { passive: false });
+
+/* ========== DRAGGABLE MAP CONTAINER ========== */
+let isDraggingMap = false, mapOX = 0, mapOY = 0;
+dragHandle.addEventListener('pointerdown', e => {
+  isDraggingMap = true;
+  dragHandle.setPointerCapture(e.pointerId);
+  const r = mapContainer.getBoundingClientRect();
+  mapOX = e.clientX - r.left; mapOY = e.clientY - r.top;
+  dragHandle.style.cursor = 'grabbing';
+  e.preventDefault(); e.stopPropagation();
+});
+dragHandle.addEventListener('pointermove', e => {
+  if (!isDraggingMap) return;
+  mapContainer.style.left      = `${e.clientX - mapOX}px`;
+  mapContainer.style.top       = `${e.clientY - mapOY}px`;
+  mapContainer.style.transform = 'none';
+});
+dragHandle.addEventListener('pointerup',     () => { isDraggingMap = false; dragHandle.style.cursor = 'grab'; });
+dragHandle.addEventListener('pointercancel', () => { isDraggingMap = false; dragHandle.style.cursor = 'grab'; });
+
+/* ========== ZOOM CONTROLS ========== */
+document.getElementById('zoomInBtn') .addEventListener('click', () => { const r = svg.getBoundingClientRect(); zoomAt(r.left + r.width/2, r.top + r.height/2, 1.3); });
+document.getElementById('zoomOutBtn').addEventListener('click', () => { const r = svg.getBoundingClientRect(); zoomAt(r.left + r.width/2, r.top + r.height/2, 1/1.3); });
+document.getElementById('zoomReset') .addEventListener('click', resetView);
+
+/* ========== SPACE = PAN MODE ========== */
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && !e.target.matches('input,textarea')) {
+    spaceDown = true;
+    if (!isPanning) svg.style.cursor = 'grab';
+    e.preventDefault();
+  }
+});
+document.addEventListener('keyup', e => {
+  if (e.code === 'Space') {
+    spaceDown = false;
+    svg.style.cursor = '';
+  }
+});
+
+/* ========== KEYBOARD SHORTCUTS ========== */
+document.addEventListener('keydown', e => {
+  if (e.target.matches('input,textarea')) return;
+  const cmd = e.metaKey || e.ctrlKey;
+  if (cmd && e.key === 'z' && !e.shiftKey) { e.preventDefault(); hist.undo(); }
+  if (cmd && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); hist.redo(); }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && selectedGroup) {
+    e.preventDefault(); hist.execute(deleteAction(selectedGroup)); selectedGroup = null;
+  }
+  if (e.key === 'Escape') { deselectAll(); if (drawing && currentPathGroup) { currentPathGroup.remove(); currentPathGroup = null; drawPoints = []; drawing = false; } }
+});
+
+/* ========== UNDO / REDO / CLEAR BUTTONS ========== */
+document.getElementById('undoBtn')   .addEventListener('click', () => hist.undo());
+document.getElementById('redoBtn')   .addEventListener('click', () => hist.redo());
+document.getElementById('eraseAllBtn').addEventListener('click', () => {
+  if (!confirm('Clear all drawings?')) return;
+  const groups = [...svg.querySelectorAll('g.frontGroup')];
+  if (!groups.length) return;
+  const snap = groups.map(g => ({ g, nxt: g.nextSibling }));
+  hist.execute({
+    exec:   () => { snap.forEach(s => s.g.remove()); if (selectedGroup) deselectAll(); updateHintVisibility(); },
+    revert: () => { snap.forEach(s => svg.insertBefore(s.g, s.nxt)); hideHint(); }
+  });
+});
+document.getElementById('m-undo') .addEventListener('click', () => hist.undo());
+document.getElementById('m-redo') .addEventListener('click', () => hist.redo());
+document.getElementById('m-erase').addEventListener('click', () => document.getElementById('eraseAllBtn').click());
+
+/* ========== IMAGE UPLOAD ========== */
+fileInput.addEventListener('change', e => {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    if (currentMapImage) currentMapImage.remove();
+    currentMapImage = document.createElement('img');
+    currentMapImage.src = ev.target.result;
+    currentMapImage.style.display = 'block';
+    mapContainer.insertBefore(currentMapImage, svg);
+    currentMapImage.onload = () => {
+      const w = currentMapImage.naturalWidth, h = currentMapImage.naturalHeight;
+      mapContainer.style.width     = `${w}px`;
+      mapContainer.style.height    = `${h + HANDLE_H}px`;
+      mapContainer.style.left      = '50%';
+      mapContainer.style.top       = '50%';
+      mapContainer.style.transform = 'translate(-50%,-50%)';
+      vb.x = 0; vb.y = 0; vb.w = w; vb.h = h;
+      initVB.w = w; initVB.h = h;
+      applyVB(); hideHint();
+    };
+  };
+  reader.readAsDataURL(file);
+  e.target.value = '';
+});
+
+/* ========== SESSION SAVE ========== */
+document.getElementById('saveSessionBtn').addEventListener('click', () => {
+  const groups = [...svg.querySelectorAll('g.frontGroup')].map(g => g.outerHTML);
+  const blob = new Blob([JSON.stringify({ version:2, viewBox: svg.getAttribute('viewBox'), groups }, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = Object.assign(document.createElement('a'), { href: url, download: 'storm_sketch.json' });
+  a.click(); URL.revokeObjectURL(url);
+});
+
+/* ========== SESSION LOAD ========== */
+document.getElementById('sessionLoadInput').addEventListener('change', e => {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      svg.querySelectorAll('g.frontGroup').forEach(g => g.remove());
+      if (data.viewBox) { const [x,y,w,h] = data.viewBox.split(' ').map(Number); vb.x=x; vb.y=y; vb.w=w; vb.h=h; initVB.w=w; initVB.h=h; applyVB(); }
+      const parser = new DOMParser();
+      data.groups.forEach(html => {
+        const doc = parser.parseFromString(`<svg xmlns="http://www.w3.org/2000/svg">${html}</svg>`, 'image/svg+xml');
+        const g = doc.querySelector('g');
+        if (g) svg.insertBefore(document.adoptNode(g), selRect);
+      });
+      updateHintVisibility(); hist.past = []; hist.future = []; hist._refresh();
+    } catch { alert('Failed to load session file.'); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+/* ========== SVG EXPORT ========== */
+function exportSVG() {
+  const vbStr = svg.getAttribute('viewBox');
+  if (!vbStr) { alert('Nothing to export yet.'); return; }
+  const [,, w, h] = vbStr.split(' ').map(Number);
+  let bgEl = null;
+  if (currentMapImage) {
+    bgEl = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+    bgEl.setAttribute('href', currentMapImage.src);
+    bgEl.setAttribute('width', w); bgEl.setAttribute('height', h);
+    bgEl.setAttribute('x', 0); bgEl.setAttribute('y', 0);
+    svg.insertBefore(bgEl, svg.querySelector('defs').nextSibling);
+  }
+  let src = new XMLSerializer().serializeToString(svg);
+  src = src.replace('<svg', `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg"`);
+  if (!src.match(/^<\?xml/)) src = '<?xml version="1.0" standalone="no"?>\r\n' + src;
+  if (bgEl) bgEl.remove();
+  const a = Object.assign(document.createElement('a'), {
+    href: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(src),
+    download: 'storm_sketch.svg'
+  });
+  a.click();
+}
+
+/* ========== PNG EXPORT ========== */
+async function exportPNG() {
+  const vbStr = svg.getAttribute('viewBox');
+  if (!vbStr) { alert('Nothing to export yet.'); return; }
+  const [vx, vy, vw, vh] = vbStr.split(' ').map(Number);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(vw); canvas.height = Math.round(vh);
+  const ctx = canvas.getContext('2d');
+
+  if (currentMapImage) ctx.drawImage(currentMapImage, 0, 0, vw, vh);
+
+  // Clone SVG, set explicit size and viewBox starting from 0,0
+  const clone = svg.cloneNode(true);
+  clone.removeAttribute('style');
+  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  clone.setAttribute('width',   vw);
+  clone.setAttribute('height',  vh);
+  clone.setAttribute('viewBox', `${vx} ${vy} ${vw} ${vh}`);
+  // Remove selection/eraser overlays
+  clone.querySelector('#sel-rect')?.remove();
+  clone.querySelector('#eraser-ring')?.remove();
+
+  const svgStr = new XMLSerializer().serializeToString(clone);
+  await new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => { ctx.drawImage(img, 0, 0); res(); };
+    img.onerror = rej;
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr);
+  });
+
+  const a = Object.assign(document.createElement('a'), {
+    href: canvas.toDataURL('image/png'),
+    download: 'storm_sketch.png'
+  });
+  a.click();
+}
+
+document.getElementById('downloadSVG').addEventListener('click', exportSVG);
+document.getElementById('downloadPNG').addEventListener('click', exportPNG);
+document.getElementById('m-svgdl').addEventListener('click', exportSVG);
+document.getElementById('m-pngdl').addEventListener('click', exportPNG);
+
+/* ========== MOBILE SIDEBAR TOGGLE ========== */
+const hamburger = document.getElementById('hamburger');
+const sidebar   = document.getElementById('sidebar');
+const overlay   = document.getElementById('overlay');
+hamburger.addEventListener('click', () => { sidebar.classList.toggle('open'); overlay.classList.toggle('show'); });
+overlay.addEventListener('click',   () => { sidebar.classList.remove('open'); overlay.classList.remove('show'); });
+sidebar.querySelectorAll('.tool-btn[data-sym]').forEach(btn => btn.addEventListener('click', () => {
+  if (window.innerWidth <= 640) { sidebar.classList.remove('open'); overlay.classList.remove('show'); }
+}));
+
+/* ========== INIT ========== */
+// Initialize undo/redo button states
+hist._refresh();
+// Set initial viewBox after layout
+requestAnimationFrame(() => { requestAnimationFrame(initViewBox); });
+// Set default mode
+setMode('coldFrontSymbol');
 </script>
 </body>
 </html>
